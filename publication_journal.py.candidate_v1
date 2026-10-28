@@ -1,0 +1,341 @@
+import fcntl
+import hashlib
+import json
+import os
+import uuid
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from typing import Any, Dict, Iterable, List
+
+
+VALID_EVENTS = {
+    "INTENT",
+    "CONFIRMED",
+    "UNCERTAIN",
+    "COMMITTED",
+    "FAILED",
+}
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(
+        timespec="seconds"
+    )
+
+
+def content_sha256(message: str) -> str:
+    return hashlib.sha256(
+        message.encode("utf-8")
+    ).hexdigest()
+
+
+def new_operation_id() -> str:
+    return uuid.uuid4().hex
+
+
+def _fsync_directory(path: str) -> None:
+    directory = os.path.abspath(path)
+
+    flags = os.O_RDONLY
+    if hasattr(os, "O_DIRECTORY"):
+        flags |= os.O_DIRECTORY
+
+    fd = os.open(directory, flags)
+
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _ensure_private_file(path: str) -> None:
+    directory = os.path.dirname(
+        os.path.abspath(path)
+    )
+
+    os.makedirs(
+        directory,
+        mode=0o700,
+        exist_ok=True,
+    )
+
+    created = False
+
+    try:
+        fd = os.open(
+            path,
+            os.O_WRONLY
+            | os.O_APPEND
+            | os.O_CREAT
+            | os.O_EXCL,
+            0o600,
+        )
+        created = True
+    except FileExistsError:
+        fd = os.open(
+            path,
+            os.O_WRONLY
+            | os.O_APPEND,
+        )
+
+    try:
+        os.fchmod(fd, 0o600)
+    finally:
+        os.close(fd)
+
+    if created:
+        _fsync_directory(directory)
+
+
+@contextmanager
+def journal_exclusive(lock_path: str):
+    _ensure_private_file(lock_path)
+
+    fd = os.open(
+        lock_path,
+        os.O_RDWR,
+    )
+
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+
+
+def append_event(
+    journal_path: str,
+    lock_path: str,
+    event: Dict[str, Any],
+) -> None:
+    event_type = event.get("event")
+
+    if event_type not in VALID_EVENTS:
+        raise ValueError(
+            f"Invalid journal event: {event_type!r}"
+        )
+
+    operation_id = event.get("operation_id")
+
+    if (
+        not isinstance(operation_id, str)
+        or not operation_id
+    ):
+        raise ValueError(
+            "operation_id must be a non-empty string"
+        )
+
+    record = dict(event)
+    record.setdefault("at", utc_now())
+
+    payload = (
+        json.dumps(
+            record,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode("utf-8")
+
+    with journal_exclusive(lock_path):
+        directory = os.path.dirname(
+            os.path.abspath(journal_path)
+        )
+
+        existed = os.path.exists(journal_path)
+
+        fd = os.open(
+            journal_path,
+            os.O_WRONLY
+            | os.O_APPEND
+            | os.O_CREAT,
+            0o600,
+        )
+
+        try:
+            os.fchmod(fd, 0o600)
+
+            written = 0
+
+            while written < len(payload):
+                n = os.write(
+                    fd,
+                    payload[written:],
+                )
+
+                if n <= 0:
+                    raise OSError(
+                        "short journal write"
+                    )
+
+                written += n
+
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+
+        if not existed:
+            _fsync_directory(directory)
+
+
+def load_events(
+    journal_path: str,
+) -> List[Dict[str, Any]]:
+    if not os.path.exists(journal_path):
+        return []
+
+    events: List[Dict[str, Any]] = []
+
+    with open(
+        journal_path,
+        "r",
+        encoding="utf-8",
+    ) as f:
+        for line_no, raw in enumerate(f, 1):
+            line = raw.strip()
+
+            if not line:
+                continue
+
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError as e:
+                raise RuntimeError(
+                    "Corrupt publication journal "
+                    f"at line {line_no}"
+                ) from e
+
+            if not isinstance(event, dict):
+                raise RuntimeError(
+                    "Invalid publication journal "
+                    f"record at line {line_no}"
+                )
+
+            if event.get("event") not in VALID_EVENTS:
+                raise RuntimeError(
+                    "Unknown publication journal "
+                    f"event at line {line_no}"
+                )
+
+            operation_id = event.get(
+                "operation_id"
+            )
+
+            if (
+                not isinstance(
+                    operation_id,
+                    str,
+                )
+                or not operation_id
+            ):
+                raise RuntimeError(
+                    "Invalid operation_id "
+                    f"at line {line_no}"
+                )
+
+            events.append(event)
+
+    return events
+
+
+def latest_by_operation(
+    events: Iterable[Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    latest: Dict[str, Dict[str, Any]] = {}
+
+    for event in events:
+        latest[event["operation_id"]] = event
+
+    return latest
+
+
+def unresolved_operations(
+    events: Iterable[Dict[str, Any]],
+) -> Dict[str, Dict[str, Any]]:
+    latest = latest_by_operation(events)
+
+    return {
+        operation_id: event
+        for operation_id, event
+        in latest.items()
+        if event["event"]
+        in {
+            "INTENT",
+            "CONFIRMED",
+            "UNCERTAIN",
+        }
+    }
+
+
+def make_intent(
+    *,
+    operation_id: str,
+    account_user_id: Any,
+    owner_id: int,
+    message: str,
+) -> Dict[str, Any]:
+    return {
+        "event": "INTENT",
+        "operation_id": operation_id,
+        "account_user_id": account_user_id,
+        "owner_id": int(owner_id),
+        "content_sha256": content_sha256(
+            message
+        ),
+    }
+
+
+def make_confirmed(
+    *,
+    operation_id: str,
+    owner_id: int,
+    post_id: int,
+) -> Dict[str, Any]:
+    return {
+        "event": "CONFIRMED",
+        "operation_id": operation_id,
+        "owner_id": int(owner_id),
+        "post_id": int(post_id),
+    }
+
+
+def make_uncertain(
+    *,
+    operation_id: str,
+    error_type: str,
+) -> Dict[str, Any]:
+    return {
+        "event": "UNCERTAIN",
+        "operation_id": operation_id,
+        "error_type": str(error_type),
+    }
+
+
+def make_committed(
+    *,
+    operation_id: str,
+    owner_id: int,
+    post_id: int,
+) -> Dict[str, Any]:
+    return {
+        "event": "COMMITTED",
+        "operation_id": operation_id,
+        "owner_id": int(owner_id),
+        "post_id": int(post_id),
+    }
+
+
+def make_failed(
+    *,
+    operation_id: str,
+    error_type: str,
+) -> Dict[str, Any]:
+    return {
+        "event": "FAILED",
+        "operation_id": operation_id,
+        "error_type": str(error_type),
+    }

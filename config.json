@@ -1,0 +1,26 @@
+{
+  "vk_accounts": [
+    {
+      "user_id": 436060535,
+      "phone": "+79235866030",
+      "token": "",
+      "enabled": false
+    }
+  ],
+  "telegram": {
+    "bot_token": "8663276510:AAE4v2wj6V4lpbOPMQ5sMtOiOXr7zjpd1nc",
+    "admin_id": 625764151,
+    "admin_ids": [
+      625764151,
+      1554626024
+    ]
+  },
+  "settings": {
+    "delay_min": 10,
+    "delay_max": 20,
+    "delete_after_min": 10,
+    "delete_after_max": 20,
+    "chats_per_account": 10,
+    "excel_file": "chats.xlsx"
+  }
+}

@@ -1,0 +1,2061 @@
+{
+  "success": 13091,
+  "errors": [
+    {
+      "time": "2026-09-14T23:15:14",
+      "group": -130981792,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-14T23:30:40",
+      "group": -96035123,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-14T23:46:08",
+      "group": -129860906,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T00:01:35",
+      "group": -11166810,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T00:16:58",
+      "group": -135934765,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T00:32:25",
+      "group": -70080727,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T00:47:52",
+      "group": -167623091,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T01:03:16",
+      "group": -148289769,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T01:18:45",
+      "group": -218604348,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T01:34:09",
+      "group": -152973815,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T01:49:35",
+      "group": -32620664,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T02:05:03",
+      "group": -166335335,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T02:17:48",
+      "group": -84114217,
+      "account": 431975582,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T02:18:18",
+      "group": -36698366,
+      "account": 487677849,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T02:19:10",
+      "group": -61856340,
+      "account": 503438182,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T02:19:40",
+      "group": -20831058,
+      "account": 1124893998,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-15T02:20:33",
+      "group": -96814732,
+      "account": 1124894033,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T02:21:03",
+      "group": -203364530,
+      "account": 1124894047,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T02:21:54",
+      "group": -214297717,
+      "account": 1124894239,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T02:22:24",
+      "group": -126019148,
+      "account": 1124894361,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T02:23:15",
+      "group": -142409834,
+      "account": 1124894467,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-15T02:23:45",
+      "group": -96828597,
+      "account": 1124894583,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T02:24:37",
+      "group": -115828788,
+      "account": 275595385,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T02:25:08",
+      "group": -29890081,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T02:28:43",
+      "group": -222270755,
+      "account": 1124894607,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T02:29:13",
+      "group": -215502787,
+      "account": 1124894659,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T02:30:06",
+      "group": -210350075,
+      "account": 1124894764,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-15T02:41:28",
+      "group": -113758765,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T02:56:56",
+      "group": -186670967,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T03:12:24",
+      "group": -218604348,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T03:27:51",
+      "group": -149430851,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T03:43:22",
+      "group": -94090753,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T03:58:52",
+      "group": -26864090,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T04:14:22",
+      "group": -73738000,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T04:29:51",
+      "group": -32620664,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T04:45:19",
+      "group": -115056827,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T05:00:47",
+      "group": -76935086,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T05:16:47",
+      "group": -169430929,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T05:32:50",
+      "group": -152973815,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T05:48:50",
+      "group": -217486243,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T06:04:53",
+      "group": -217267002,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T06:20:57",
+      "group": -174639233,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T06:37:02",
+      "group": -220784114,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T06:52:35",
+      "group": -76739021,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T07:08:01",
+      "group": -87281628,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T07:23:30",
+      "group": -203364530,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T07:39:05",
+      "group": -233696042,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T07:54:34",
+      "group": -119101202,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T08:10:06",
+      "group": -35244909,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T08:18:49",
+      "group": -71430024,
+      "account": 431975582,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T08:19:20",
+      "group": -92001296,
+      "account": 487677849,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T08:20:12",
+      "group": -82363327,
+      "account": 503438182,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T08:20:42",
+      "group": -152270197,
+      "account": 1124893998,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-15T08:21:35",
+      "group": -168440538,
+      "account": 1124894033,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T08:22:05",
+      "group": -170850133,
+      "account": 1124894047,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T08:22:58",
+      "group": -111617729,
+      "account": 1124894239,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T08:23:28",
+      "group": -190261310,
+      "account": 1124894361,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T08:24:21",
+      "group": -221247926,
+      "account": 1124894467,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-15T08:24:51",
+      "group": -218833142,
+      "account": 1124894583,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T08:25:43",
+      "group": -218833155,
+      "account": 275595385,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T08:26:13",
+      "group": -164364651,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T08:29:47",
+      "group": -166335335,
+      "account": 1124894607,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T08:30:18",
+      "group": -221082746,
+      "account": 1124894659,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T08:31:09",
+      "group": -62465528,
+      "account": 1124894764,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-15T08:41:15",
+      "group": -147481905,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T08:56:52",
+      "group": -63327436,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T09:12:27",
+      "group": -91531516,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T09:28:02",
+      "group": -156584844,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T09:43:34",
+      "group": -89302670,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T09:59:08",
+      "group": -190060743,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T10:14:44",
+      "group": -62021194,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T10:30:19",
+      "group": -192930796,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T10:45:58",
+      "group": -43705115,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T11:01:34",
+      "group": -152888365,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T11:17:07",
+      "group": -196674442,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T11:32:42",
+      "group": -113758765,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T11:48:19",
+      "group": -186670967,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T12:03:55",
+      "group": -152973815,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T12:19:32",
+      "group": -174639233,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T12:35:08",
+      "group": -32620664,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T12:50:41",
+      "group": -153029899,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T13:06:17",
+      "group": -76935086,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T13:21:52",
+      "group": -87281628,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T13:37:30",
+      "group": -34198864,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T13:53:11",
+      "group": -190261310,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T14:08:42",
+      "group": -141669199,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T14:20:09",
+      "group": -70080727,
+      "account": 431975582,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T14:20:40",
+      "group": -218604348,
+      "account": 487677849,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T14:21:33",
+      "group": -127032348,
+      "account": 503438182,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T14:22:03",
+      "group": -87934715,
+      "account": 1124893998,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-15T14:22:56",
+      "group": -129860906,
+      "account": 1124894033,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T14:23:26",
+      "group": -186670967,
+      "account": 1124894047,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T14:24:19",
+      "group": -148096990,
+      "account": 1124894239,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T14:24:49",
+      "group": -75119076,
+      "account": 1124894361,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T14:25:42",
+      "group": -98075188,
+      "account": 1124894467,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-15T14:26:12",
+      "group": -73054968,
+      "account": 1124894583,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T14:27:05",
+      "group": -94486052,
+      "account": 275595385,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T14:27:35",
+      "group": -180685626,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T14:29:51",
+      "group": -94090753,
+      "account": 1124894607,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T14:30:21",
+      "group": -102886517,
+      "account": 1124894659,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T14:31:14",
+      "group": -38210023,
+      "account": 1124894764,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-15T14:42:39",
+      "group": -77062373,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T14:58:17",
+      "group": -177082393,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T15:13:53",
+      "group": -190382283,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T15:29:24",
+      "group": -174639233,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T15:44:58",
+      "group": -121639544,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T16:00:30",
+      "group": -26864090,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T16:16:02",
+      "group": -91729604,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T16:31:36",
+      "group": -120219007,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T16:47:12",
+      "group": -68002131,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T17:02:47",
+      "group": -34198864,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T17:18:24",
+      "group": -191591467,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T17:33:59",
+      "group": -165501960,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T17:49:41",
+      "group": -176621849,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T18:05:18",
+      "group": -78763784,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T18:20:53",
+      "group": -152901365,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T18:36:25",
+      "group": -128733725,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T18:52:02",
+      "group": -37759830,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T19:07:36",
+      "group": -64106506,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T19:23:11",
+      "group": -130981792,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T19:38:54",
+      "group": -96035123,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T19:54:55",
+      "group": -129860906,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T20:10:58",
+      "group": -11166810,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T20:21:19",
+      "group": -135934765,
+      "account": 431975582,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T20:21:50",
+      "group": -70080727,
+      "account": 487677849,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T20:22:44",
+      "group": -167623091,
+      "account": 503438182,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T20:23:15",
+      "group": -148289769,
+      "account": 1124893998,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-15T20:24:10",
+      "group": -218604348,
+      "account": 1124894033,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T20:24:40",
+      "group": -152973815,
+      "account": 1124894047,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T20:25:36",
+      "group": -32620664,
+      "account": 1124894239,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T20:26:06",
+      "group": -166335335,
+      "account": 1124894361,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T20:27:01",
+      "group": -84114217,
+      "account": 1124894467,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-15T20:27:32",
+      "group": -36698366,
+      "account": 1124894583,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T20:28:26",
+      "group": -61856340,
+      "account": 275595385,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T20:28:57",
+      "group": -20831058,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T20:29:52",
+      "group": -96814732,
+      "account": 1124894607,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-15T20:30:22",
+      "group": -203364530,
+      "account": 1124894659,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-15T20:31:16",
+      "group": -214297717,
+      "account": 1124894764,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-15T20:44:27",
+      "group": -126019148,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T21:00:27",
+      "group": -142409834,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T21:16:25",
+      "group": -96828597,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T21:32:23",
+      "group": -115828788,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T21:48:23",
+      "group": -29890081,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T22:04:20",
+      "group": -222270755,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T22:20:20",
+      "group": -215502787,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T22:36:19",
+      "group": -210350075,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T22:52:17",
+      "group": -113758765,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T23:08:11",
+      "group": -186670967,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T23:24:25",
+      "group": -218604348,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T23:40:23",
+      "group": -149430851,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-15T23:56:46",
+      "group": -94090753,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T00:12:46",
+      "group": -26864090,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T00:28:43",
+      "group": -73738000,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T00:44:43",
+      "group": -32620664,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T01:00:40",
+      "group": -115056827,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T01:16:36",
+      "group": -76935086,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T01:32:34",
+      "group": -169430929,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T01:48:30",
+      "group": -152973815,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T02:04:26",
+      "group": -217486243,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T02:20:25",
+      "group": -217267002,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T02:22:20",
+      "group": -174639233,
+      "account": 431975582,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-16T02:22:50",
+      "group": -220784114,
+      "account": 487677849,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-16T02:23:44",
+      "group": -76739021,
+      "account": 503438182,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-16T02:24:14",
+      "group": -87281628,
+      "account": 1124893998,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-16T02:25:09",
+      "group": -203364530,
+      "account": 1124894033,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-16T02:25:39",
+      "group": -233696042,
+      "account": 1124894047,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-16T02:26:34",
+      "group": -119101202,
+      "account": 1124894239,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-16T02:27:04",
+      "group": -35244909,
+      "account": 1124894361,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-16T02:27:59",
+      "group": -71430024,
+      "account": 1124894467,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-16T02:28:29",
+      "group": -92001296,
+      "account": 1124894583,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-16T02:29:23",
+      "group": -82363327,
+      "account": 275595385,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-16T02:29:54",
+      "group": -152270197,
+      "account": 1124894607,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-16T02:30:48",
+      "group": -168440538,
+      "account": 1124894659,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-16T02:31:19",
+      "group": -170850133,
+      "account": 1124894764,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-16T02:36:27",
+      "group": -111617729,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T02:52:24",
+      "group": -190261310,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T03:08:23",
+      "group": -221247926,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T03:24:22",
+      "group": -218833142,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T03:40:20",
+      "group": -218833155,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T03:56:19",
+      "group": -164364651,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T04:12:15",
+      "group": -166335335,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T04:28:16",
+      "group": -221082746,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T04:44:24",
+      "group": -62465528,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T04:59:54",
+      "group": -147481905,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T05:15:21",
+      "group": -63327436,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T05:30:50",
+      "group": -91531516,
+      "account": 436060535,
+      "type": "temporary_account",
+      "code": 9,
+      "error": "[9] Flood control"
+    },
+    {
+      "time": "2026-09-16T08:23:17",
+      "group": -156584844,
+      "account": 431975582,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-16T08:23:47",
+      "group": -89302670,
+      "account": 487677849,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-16T08:24:18",
+      "group": -190060743,
+      "account": 503438182,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-16T08:24:48",
+      "group": -62021194,
+      "account": 1124893998,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-16T08:25:18",
+      "group": -192930796,
+      "account": 1124894033,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-16T08:25:48",
+      "group": -43705115,
+      "account": 1124894047,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-16T08:27:19",
+      "group": -152888365,
+      "account": 1124894239,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-16T08:27:49",
+      "group": -196674442,
+      "account": 1124894361,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-16T08:28:19",
+      "group": -113758765,
+      "account": 1124894467,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-16T08:28:50",
+      "group": -186670967,
+      "account": 1124894583,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-16T08:30:20",
+      "group": -152973815,
+      "account": 1124894607,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    },
+    {
+      "time": "2026-09-16T08:30:50",
+      "group": -174639233,
+      "account": 1124894659,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: invalid access_token (4)."
+    },
+    {
+      "time": "2026-09-16T08:31:20",
+      "group": -32620664,
+      "account": 1124894764,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: access_token was given to another ip address"
+    },
+    {
+      "time": "2026-09-16T08:31:51",
+      "group": -153029899,
+      "account": 275595385,
+      "type": "auth",
+      "code": 5,
+      "error": "[5] User authorization failed: user is blocked."
+    }
+  ],
+  "accounts_status": {
+    "1124894033": {
+      "status": "AUTH_ERROR_5",
+      "updated_at": "2026-09-16T08:25:18"
+    },
+    "275595385": {
+      "status": "AUTH_ERROR_5",
+      "updated_at": "2026-09-16T08:31:51"
+    },
+    "436060535": {
+      "status": "TEMP_ERROR_9",
+      "updated_at": "2026-09-16T05:30:50"
+    },
+    "431975582": {
+      "status": "AUTH_ERROR_5",
+      "updated_at": "2026-09-16T08:23:17"
+    },
+    "487677849": {
+      "status": "AUTH_ERROR_5",
+      "updated_at": "2026-09-16T08:23:47"
+    },
+    "503438182": {
+      "status": "AUTH_ERROR_5",
+      "updated_at": "2026-09-16T08:24:18"
+    },
+    "1124893998": {
+      "status": "AUTH_ERROR_5",
+      "updated_at": "2026-09-16T08:24:48"
+    },
+    "1124894047": {
+      "status": "AUTH_ERROR_5",
+      "updated_at": "2026-09-16T08:25:48"
+    },
+    "1124894239": {
+      "status": "AUTH_ERROR_5",
+      "updated_at": "2026-09-16T08:27:19"
+    },
+    "1124894361": {
+      "status": "AUTH_ERROR_5",
+      "updated_at": "2026-09-16T08:27:49"
+    },
+    "1124894467": {
+      "status": "AUTH_ERROR_5",
+      "updated_at": "2026-09-16T08:28:19"
+    },
+    "1124894583": {
+      "status": "AUTH_ERROR_5",
+      "updated_at": "2026-09-16T08:28:50"
+    },
+    "1124894607": {
+      "status": "AUTH_ERROR_5",
+      "updated_at": "2026-09-16T08:30:20"
+    },
+    "1124894659": {
+      "status": "AUTH_ERROR_5",
+      "updated_at": "2026-09-16T08:30:50"
+    },
+    "1124894764": {
+      "status": "AUTH_ERROR_5",
+      "updated_at": "2026-09-16T08:31:20"
+    }
+  },
+  "groups_status": {
+    "-186670967": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:49:23"
+    },
+    "-220784114": {
+      "status": "LIMIT_214",
+      "updated_at": "2026-09-08T11:03:05"
+    },
+    "-76739021": {
+      "status": "LIMIT_214",
+      "updated_at": "2026-09-08T11:03:36"
+    },
+    "-87281628": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:43:50"
+    },
+    "-203364530": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:04:54"
+    },
+    "-233696042": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:05:41"
+    },
+    "-119101202": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:06:12"
+    },
+    "-71430024": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:07:31"
+    },
+    "-92001296": {
+      "status": "LIMIT_214",
+      "updated_at": "2026-09-08T11:08:18"
+    },
+    "-82363327": {
+      "status": "VK_ERROR_15",
+      "updated_at": "2026-09-08T11:08:49"
+    },
+    "-152270197": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:09:36"
+    },
+    "-168440538": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:10:07"
+    },
+    "-170850133": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:10:54"
+    },
+    "-111617729": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:11:25"
+    },
+    "-190261310": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:45:06"
+    },
+    "-221247926": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:12:43"
+    },
+    "-218833142": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:13:32"
+    },
+    "-218833155": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:14:02"
+    },
+    "-164364651": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:14:50"
+    },
+    "-166335335": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:15:20"
+    },
+    "-221082746": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:16:06"
+    },
+    "-62465528": {
+      "status": "LIMIT_214",
+      "updated_at": "2026-09-08T11:16:37"
+    },
+    "-147481905": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:17:24"
+    },
+    "-63327436": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:01:05"
+    },
+    "-91531516": {
+      "status": "LIMIT_214",
+      "updated_at": "2026-09-08T11:33:37"
+    },
+    "-156584844": {
+      "status": "LIMIT_214",
+      "updated_at": "2026-09-08T11:34:08"
+    },
+    "-89302670": {
+      "status": "LIMIT_214",
+      "updated_at": "2026-09-08T11:34:55"
+    },
+    "-190060743": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:35:25"
+    },
+    "-62021194": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:36:13"
+    },
+    "-192930796": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:36:44"
+    },
+    "-43705115": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:37:30"
+    },
+    "-152888365": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:38:00"
+    },
+    "-196674442": {
+      "status": "LIMIT_214",
+      "updated_at": "2026-09-08T11:38:47"
+    },
+    "-113758765": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:39:18"
+    },
+    "-152973815": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:40:34"
+    },
+    "-174639233": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:57:45"
+    },
+    "-32620664": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:41:50"
+    },
+    "-153029899": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:42:35"
+    },
+    "-76935086": {
+      "status": "LIMIT_214",
+      "updated_at": "2026-09-08T11:43:05"
+    },
+    "-34198864": {
+      "status": "OK",
+      "updated_at": "2026-09-08T12:01:36"
+    },
+    "-141669199": {
+      "status": "LIMIT_214",
+      "updated_at": "2026-09-08T11:45:36"
+    },
+    "-70080727": {
+      "status": "OK",
+      "updated_at": "2026-09-11T19:53:44"
+    },
+    "-218604348": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:46:53"
+    },
+    "-127032348": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:47:37"
+    },
+    "-87934715": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:48:08"
+    },
+    "-129860906": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:48:53"
+    },
+    "-148096990": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:50:09"
+    },
+    "-75119076": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:50:39"
+    },
+    "-98075188": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:51:24"
+    },
+    "-73054968": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:51:55"
+    },
+    "-94486052": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:52:40"
+    },
+    "-180685626": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:53:11"
+    },
+    "-94090753": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:53:56"
+    },
+    "-102886517": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:54:26"
+    },
+    "-38210023": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:55:11"
+    },
+    "-77062373": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:55:42"
+    },
+    "-177082393": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:56:28"
+    },
+    "-190382283": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:56:58"
+    },
+    "-121639544": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:58:15"
+    },
+    "-26864090": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:59:02"
+    },
+    "-91729604": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:59:33"
+    },
+    "-120219007": {
+      "status": "OK",
+      "updated_at": "2026-09-08T12:00:19"
+    },
+    "-68002131": {
+      "status": "OK",
+      "updated_at": "2026-09-08T12:00:49"
+    },
+    "-191591467": {
+      "status": "OK",
+      "updated_at": "2026-09-08T12:02:06"
+    },
+    "-165501960": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:31:04"
+    },
+    "-176621849": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:31:51"
+    },
+    "-78763784": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:32:21"
+    },
+    "-152901365": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:33:09"
+    },
+    "-128733725": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:33:39"
+    },
+    "-37759830": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:34:26"
+    },
+    "-64106506": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:34:56"
+    },
+    "-130981792": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:35:44"
+    },
+    "-96035123": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:36:14"
+    },
+    "-11166810": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:37:32"
+    },
+    "-135934765": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:38:20"
+    },
+    "-167623091": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:39:39"
+    },
+    "-148289769": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:40:10"
+    },
+    "-84114217": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:43:33"
+    },
+    "-36698366": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:44:03"
+    },
+    "-61856340": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:44:51"
+    },
+    "-20831058": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:45:21"
+    },
+    "-96814732": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:46:09"
+    },
+    "-214297717": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:47:29"
+    },
+    "-126019148": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:47:59"
+    },
+    "-142409834": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:48:46"
+    },
+    "-96828597": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:49:17"
+    },
+    "-115828788": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:50:06"
+    },
+    "-29890081": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:50:36"
+    },
+    "-222270755": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:51:23"
+    },
+    "-215502787": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:51:54"
+    },
+    "-210350075": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:52:42"
+    },
+    "-149430851": {
+      "status": "LIMIT_214",
+      "updated_at": "2026-09-08T10:55:17"
+    },
+    "-73738000": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:57:05"
+    },
+    "-115056827": {
+      "status": "OK",
+      "updated_at": "2026-09-08T10:58:23"
+    },
+    "-169430929": {
+      "status": "LIMIT_214",
+      "updated_at": "2026-09-08T10:59:41"
+    },
+    "-217486243": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:00:59"
+    },
+    "-217267002": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:01:47"
+    },
+    "-35244909": {
+      "status": "OK",
+      "updated_at": "2026-09-08T11:07:00"
+    }
+  }
+}

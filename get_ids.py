@@ -1,0 +1,176 @@
+import vk_api
+from openpyxl import Workbook
+
+# Используем первый рабочий токен, который мы уже получили
+TOKEN = "vk1.a.CLhbJ_d0YMRvA7Ju0NW7Bw-uADQ97TDIn9iY9cRgWBEgvgHXj8ECGrUh_IeTRqBnOfHlX-HHr4mO-UouXITf2tT6kjbo4nvWbfFl_pb8vnc1bVCClE8aJBm1PP-Oa_uRw8T6c7Rv7-7w0MuwOLrXOnJTEGHeSYcm5QkXE9sMihlqAZT5aqIJxjo7GyAxvk7ZkX5Mp4QxznQjeXzNdOrzLQ"
+
+vk_session = vk_api.VkApi(token=TOKEN)
+vk = vk_session.get_api()
+
+# Твой список ссылок
+urls = """
+https://vk.com/poputchiki19
+https://vk.com/19kray24
+https://vk.com/24kray24
+https://vk.com/club149430851
+https://vk.com/poputkakrasnoyarsk
+https://vk.com/vputi_krasnoyarsk
+https://vk.com/super_laike17
+https://vk.com/poputka_abakan_krasnoyarsk
+https://vk.com/poputchiki_kyzyl_krasnoyarsk
+https://vk.com/poputikansk
+https://vk.com/poputka_hakasia
+https://vk.com/turistdoska11
+https://vk.com/passagiry_kyzyl_krasnoyarsk
+https://vk.com/19abaza
+https://vk.com/poputchik_krasnoyarsk_abakan
+https://vk.com/poputkakzlabakan
+https://vk.com/moiapoputka24
+https://vk.com/club87281628
+https://vk.com/poputnyi_gruz.krasnoyarsc
+https://vk.com/kizil_kray
+https://vk.com/poputkatuva17
+https://vk.com/club35244909
+https://vk.com/poputkasibir
+https://vk.com/abakan_achinsk_krasnoyarsk
+https://vk.com/club82363327
+https://vk.com/abakania
+https://vk.com/tiva17
+https://vk.com/shush24
+https://vk.com/krasnoyarsk__kyzyl
+https://vk.com/saiani019
+https://vk.com/gruz_poputi
+https://vk.com/poputkatuva1
+https://vk.com/kyzyl17_krasnoyarsk
+https://vk.com/krasnoyarsk_kyzyl
+https://vk.com/ermakovskae
+https://vk.com/elita_kizil
+https://vk.com/club62465528
+https://vk.com/poputkakyzyl
+https://vk.com/club147481905
+https://vk.com/club63327436
+https://vk.com/balahtapop
+https://vk.com/askizpoputka
+https://vk.com/popytka24k
+https://vk.com/tuvapoputka17
+https://vk.com/poputkatuvaaa
+https://vk.com/poputchiki_sibir
+https://vk.com/popytkykyzylkrasnoyrsk
+https://vk.com/myblablacar
+https://vk.com/popytka1rossia
+https://vk.com/club196674442
+https://vk.ru/poputchiki19
+https://vk.ru/19kray24
+https://vk.ru/turistdoska11
+https://vk.ru/poputchik_krasnoyarsk_abakan
+https://vk.ru/poputka_abakan_krasnoyarsk
+https://vk.ru/poputiabakankyzyl
+https://vk.ru/poputikansk
+https://vk.ru/club87281628
+https://vk.ru/taxi_abakan_krasnoyarsk
+https://vk.ru/saiani019
+https://vk.ru/club141669199
+https://vk.ru/poputkoy
+https://vk.ru/24kray24
+https://vk.ru/club127032348
+https://vk.ru/poputchik_iz_kzl
+https://vk.ru/carriageofpassengers
+https://vk.ru/19kray24
+https://vk.ru/poputchikisnami
+https://vk.ru/club75119076
+https://vk.ru/poputchiki_kja
+https://vk.ru/club73054968
+https://vk.ru/club94486052
+https://vk.ru/club180685626
+https://vk.ru/poputkakrasnoyarsk
+https://vk.ru/club102886517
+https://vk.ru/club38210023
+https://vk.ru/poputki24
+https://vk.ru/siberian_road
+https://vk.ru/krasnoyarsk_fellow_travelers
+https://vk.ru/poputchik_krasnoyarsk_abakan
+https://vk.ru/poputchiki19_rus
+https://vk.ru/vputi_krasnoyarsk
+https://vk.ru/krasnoyarskyug
+https://vk.ru/abakan.krasnoyarsk
+https://vk.ru/club68002131
+https://vk.ru/taxi_abakan_krasnoyarsk
+https://vk.ru/doroga124
+https://vk.ru/club165501960
+https://vk.ru/club176621849
+https://vk.ru/kraspk24
+https://vk.ru/club152901365
+https://vk.ru/minusgo
+https://vk.ru/krasnoyarsk24abakan19
+https://vk.ru/poputch_krsk
+https://vk.ru/club130981792
+https://vk.ru/putydoroga
+https://vk.ru/carriageofpassengers
+https://vk.ru/elsib
+https://vk.ru/club135934765
+https://vk.ru/poputkoy
+https://vk.ru/po_putynam
+https://vk.ru/popabakan17
+https://vk.ru/24kray24
+https://vk.ru/turistdoska11
+https://vk.ru/poputka_abakan_krasnoyarsk
+https://vk.ru/ermakovskae
+https://vk.ru/poputka124
+https://vk.ru/club36698366
+https://vk.ru/popytchiki24
+https://vk.ru/club20831058
+https://vk.ru/poputka_krasnoyarsk
+https://vk.ru/poputnyi_gruz.krasnoyarsc
+https://vk.ru/poputchik_abk_krs
+https://vk.ru/club126019148
+https://vk.ru/yedyyvezy
+https://vk.ru/podvezu_minusinsk
+https://vk.ru/poputchik_krasnojarsk_abakan
+https://vk.ru/poputkaminusinskkrasnoyarsk
+https://vk.ru/abakan_krasnoyarsk
+https://vk.ru/tyr17
+https://vk.ru/poputchik1719
+"""
+
+wb = Workbook()
+ws = wb.active
+ws.title = "Chats"
+ws.append(["chat_id", "message"])
+
+# Разбиваем текст на отдельные ссылки
+url_list = [url.strip() for url in urls.strip().split('\n') if url.strip()]
+
+print(f"🔍 Начинаем обработку {len(url_list)} ссылок...\n")
+
+success_count = 0
+for url in url_list:
+    # Очищаем ссылку, оставляем только имя
+    clean_name = url.replace('https://vk.com/', '').replace('https://vk.ru/', '').strip('/')
+    if not clean_name:
+        continue
+
+    try:
+        if clean_name.startswith('club'):
+            # Если это уже цифровой ID вида club12345
+            group_id = int(clean_name.replace('club', ''))
+            peer_id = -group_id
+        else:
+            # Если это короткое имя, спрашиваем у ВК
+            res = vk.utils.resolveScreenName(screen_name=clean_name)
+            if res['type'] == 'group':
+                peer_id = -res['object_id'] # Для групп ID всегда отрицательный!
+            else:
+                print(f"⚠️ Пропуск {clean_name}: это не группа")
+                continue
+        
+        # Добавляем в Excel
+        ws.append([peer_id, "Привет! Это сообщение от бота."])
+        print(f"✅ {clean_name:<35} -> {peer_id}")
+        success_count += 1
+        
+    except Exception as e:
+        print(f"❌ Ошибка с {clean_name}: {e}")
+
+wb.save("chats.xlsx")
+print(f"\n🎉 ГОТОВО! Успешно обработано {success_count} групп.")
+print("Файл chats.xlsx обновлен и готов к использованию ботом!")

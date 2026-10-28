@@ -1,0 +1,272 @@
+{
+  "success": 10871,
+  "errors": [
+    {
+      "group": -34198864,
+      "error": "[5] User authorization failed: invalid access_token (4).",
+      "account": 1124894239
+    },
+    {
+      "group": -191591467,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894361
+    },
+    {
+      "group": -165501960,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894467
+    },
+    {
+      "group": -176621849,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894583
+    },
+    {
+      "group": -78763784,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894607
+    },
+    {
+      "group": -152901365,
+      "error": "[5] User authorization failed: invalid access_token (4).",
+      "account": 1124894659
+    },
+    {
+      "group": -128733725,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894764
+    },
+    {
+      "group": -37759830,
+      "error": "[5] User authorization failed: user is blocked.",
+      "account": 275595385
+    },
+    {
+      "group": -130981792,
+      "error": "[5] User authorization failed: invalid access_token (4).",
+      "account": 431975582
+    },
+    {
+      "group": -96035123,
+      "error": "[5] User authorization failed: user is blocked.",
+      "account": 487677849
+    },
+    {
+      "group": -129860906,
+      "error": "[5] User authorization failed: invalid access_token (4).",
+      "account": 503438182
+    },
+    {
+      "group": -11166810,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124893998
+    },
+    {
+      "group": -135934765,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894033
+    },
+    {
+      "group": -70080727,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894047
+    },
+    {
+      "group": -167623091,
+      "error": "[5] User authorization failed: invalid access_token (4).",
+      "account": 1124894239
+    },
+    {
+      "group": -148289769,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894361
+    },
+    {
+      "group": -218604348,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894467
+    },
+    {
+      "group": -152973815,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894583
+    },
+    {
+      "group": -32620664,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894607
+    },
+    {
+      "group": -166335335,
+      "error": "[5] User authorization failed: invalid access_token (4).",
+      "account": 1124894659
+    },
+    {
+      "group": -84114217,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894764
+    },
+    {
+      "group": -36698366,
+      "error": "[5] User authorization failed: user is blocked.",
+      "account": 275595385
+    },
+    {
+      "group": -20831058,
+      "error": "[5] User authorization failed: invalid access_token (4).",
+      "account": 431975582
+    },
+    {
+      "group": -96814732,
+      "error": "[5] User authorization failed: user is blocked.",
+      "account": 487677849
+    },
+    {
+      "group": -203364530,
+      "error": "[5] User authorization failed: invalid access_token (4).",
+      "account": 503438182
+    },
+    {
+      "group": -214297717,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124893998
+    },
+    {
+      "group": -126019148,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894033
+    },
+    {
+      "group": -142409834,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894047
+    },
+    {
+      "group": -96828597,
+      "error": "[5] User authorization failed: invalid access_token (4).",
+      "account": 1124894239
+    },
+    {
+      "group": -115828788,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894361
+    },
+    {
+      "group": -29890081,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894467
+    },
+    {
+      "group": -222270755,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894583
+    },
+    {
+      "group": -215502787,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894607
+    },
+    {
+      "group": -210350075,
+      "error": "[5] User authorization failed: invalid access_token (4).",
+      "account": 1124894659
+    },
+    {
+      "group": -113758765,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894764
+    },
+    {
+      "group": -186670967,
+      "error": "[5] User authorization failed: user is blocked.",
+      "account": 275595385
+    },
+    {
+      "group": -149430851,
+      "error": "[5] User authorization failed: invalid access_token (4).",
+      "account": 431975582
+    },
+    {
+      "group": -94090753,
+      "error": "[5] User authorization failed: user is blocked.",
+      "account": 487677849
+    },
+    {
+      "group": -26864090,
+      "error": "[5] User authorization failed: invalid access_token (4).",
+      "account": 503438182
+    },
+    {
+      "group": -73738000,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124893998
+    },
+    {
+      "group": -32620664,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894033
+    },
+    {
+      "group": -115056827,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894047
+    },
+    {
+      "group": -76935086,
+      "error": "[5] User authorization failed: invalid access_token (4).",
+      "account": 1124894239
+    },
+    {
+      "group": -169430929,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894361
+    },
+    {
+      "group": -152973815,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894467
+    },
+    {
+      "group": -217486243,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894583
+    },
+    {
+      "group": -217267002,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894607
+    },
+    {
+      "group": -174639233,
+      "error": "[5] User authorization failed: invalid access_token (4).",
+      "account": 1124894659
+    },
+    {
+      "group": -220784114,
+      "error": "[5] User authorization failed: access_token was given to another ip address",
+      "account": 1124894764
+    },
+    {
+      "group": -76739021,
+      "error": "[5] User authorization failed: user is blocked.",
+      "account": 275595385
+    }
+  ],
+  "accounts_status": {
+    "1124894033": "Error 5",
+    "275595385": "Error 5",
+    "436060535": "OK",
+    "431975582": "Error 5",
+    "487677849": "Error 5",
+    "503438182": "Error 5",
+    "1124893998": "Error 5",
+    "1124894047": "Error 5",
+    "1124894239": "Error 5",
+    "1124894361": "Error 5",
+    "1124894467": "Error 5",
+    "1124894583": "Error 5",
+    "1124894607": "Error 5",
+    "1124894659": "Error 5",
+    "1124894764": "Error 5"
+  }
+}

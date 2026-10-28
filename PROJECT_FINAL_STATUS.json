@@ -1,0 +1,37 @@
+{
+  "checked_at": "2026-10-07T08:04:06",
+  "project": "VKBot multi-account queue",
+  "accounts": [
+    {
+      "id": 1,
+      "code": "main",
+      "name": "Основной аккаунт",
+      "enabled": 1,
+      "auth_status": "AUTHORIZED",
+      "status": "READY"
+    },
+    {
+      "id": 2,
+      "code": "second",
+      "name": "Второй аккаунт",
+      "enabled": 1,
+      "auth_status": "AUTHORIZED",
+      "status": "READY"
+    }
+  ],
+  "queue": {
+    "WAITING": 100
+  },
+  "max_parallel_accounts": 1,
+  "min_delay_sec": "900",
+  "max_delay_sec": "2100",
+  "group_cooldown_hours": "72",
+  "production_master_unlocked": false,
+  "real_vk_actions_enabled": false,
+  "suggest_enabled": false,
+  "create_enabled": false,
+  "subscribe_enabled": false,
+  "join_enabled": false,
+  "production_autostart": false,
+  "dry_run": "PASS"
+}
