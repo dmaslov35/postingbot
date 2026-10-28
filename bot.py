@@ -1,0 +1,863 @@
+import json
+import logging
+import os
+import random
+import tempfile
+import time
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+import vk_api
+from openpyxl import load_workbook
+from account_lifecycle_lock import account_lifecycle_shared
+from posts_transaction_lock import published_posts_exclusive, published_posts_shared
+from publication_journal import append_event, latest_by_operation, load_events, make_committed, make_confirmed, make_failed, make_intent, make_uncertain, new_operation_id
+PUBLICATION_JOURNAL_PATH = '/opt/vkbot/publication_journal.jsonl'
+PUBLICATION_JOURNAL_LOCK_PATH = '/opt/vkbot/.publication_journal.lock'
+from logging.handlers import WatchedFileHandler
+os.makedirs('logs', exist_ok=True)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[WatchedFileHandler('logs/bot.log', encoding='utf-8'), logging.StreamHandler()])
+logger = logging.getLogger(__name__)
+POSTS_FILE = 'published_posts.json'
+STATS_FILE = 'bot_stats.json'
+STATE_FILE = 'bot_state.json'
+PAUSE_FILE = 'pause.flag'
+MONTHS_RU = ['Января', 'Февраля', 'Марта', 'Апреля', 'Мая', 'Июня', 'Июля', 'Августа', 'Сентября', 'Октября', 'Ноября', 'Декабря']
+DEFAULT_SETTINGS = {'post_interval': 30, 'check_interval': 7200, 'delete_delay': 10}
+AUTH_ERROR_CODES = {5, 27, 28}
+ACCOUNT_COOLDOWN_ERROR_CODES = {6, 9, 10, 29}
+DEFAULT_ACCOUNT_COOLDOWN_SECONDS = 15 * 60
+NETWORK_RETRIES = 3
+DELETED_POST_RETENTION_HOURS = 24
+
+def atomic_write_json(path: str, data: Any) -> None:
+    """
+    Atomically write JSON and durably persist the directory entry.
+
+    Durability order:
+      1. write temporary file
+      2. flush + fsync temporary file
+      3. os.replace into final pathname
+      4. fsync parent directory
+    """
+    directory = os.path.dirname(os.path.abspath(path))
+    os.makedirs(directory, exist_ok=True)
+    fd, temp_path = tempfile.mkstemp(prefix=f'.{os.path.basename(path)}.', suffix='.tmp', dir=directory, text=True)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, path)
+        dir_flags = os.O_RDONLY
+        if hasattr(os, 'O_DIRECTORY'):
+            dir_flags |= os.O_DIRECTORY
+        dir_fd = os.open(directory, dir_flags)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    finally:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+
+def load_json_file(path: str, default: Any) -> Any:
+    """Безопасно читает JSON. При повреждении файла не роняет весь бот."""
+    if not os.path.exists(path):
+        return default
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        logger.error('Не удалось прочитать %s: %s', path, e)
+        return default
+
+def load_config() -> Dict[str, Any]:
+    with open('config.json', 'r', encoding='utf-8') as f:
+        config = json.load(f)
+    if 'vk_accounts' not in config:
+        raise ValueError('В config.json отсутствует секция vk_accounts')
+    if 'settings' not in config:
+        raise ValueError('В config.json отсутствует секция settings')
+    return config
+
+def load_settings() -> Dict[str, int]:
+    raw = load_json_file('settings.json', DEFAULT_SETTINGS.copy())
+    settings = DEFAULT_SETTINGS.copy()
+    for key in DEFAULT_SETTINGS:
+        try:
+            value = int(raw.get(key, DEFAULT_SETTINGS[key]))
+            if value <= 0:
+                raise ValueError
+            settings[key] = value
+        except (TypeError, ValueError):
+            logger.warning('Некорректное значение settings[%s]=%r. Используется %s', key, raw.get(key), DEFAULT_SETTINGS[key])
+    return settings
+
+def load_groups(excel_file: str) -> List[int]:
+    groups: List[int] = []
+    try:
+        wb = load_workbook(excel_file, read_only=True, data_only=True)
+        sheet = wb.active
+        for row in sheet.iter_rows(min_row=2, values_only=True):
+            if row and row[0] is not None:
+                try:
+                    groups.append(int(row[0]))
+                except (TypeError, ValueError):
+                    logger.warning('Пропущен некорректный ID группы: %r', row[0])
+        wb.close()
+        logger.info('Загружено групп: %s', len(groups))
+    except Exception as e:
+        logger.exception('Ошибка чтения групп из %s: %s', excel_file, e)
+    return groups
+
+def load_messages(messages_file: str) -> List[str]:
+    messages: List[str] = []
+    try:
+        wb = load_workbook(messages_file, read_only=True, data_only=True)
+        sheet = wb.active
+        for row in sheet.iter_rows(min_row=2, values_only=True):
+            if row and row[0]:
+                messages.append(str(row[0]))
+        wb.close()
+        logger.info('Загружено текстов: %s', len(messages))
+    except Exception as e:
+        logger.exception('Ошибка чтения текстов из %s: %s', messages_file, e)
+    return messages
+
+def load_published_posts() -> List[Dict[str, Any]]:
+    """
+    Strict fail-closed loader for the publication queue.
+
+    Missing, unreadable, malformed or structurally invalid queue data
+    must never be interpreted as an empty queue.
+    """
+    try:
+        with open(POSTS_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except FileNotFoundError as e:
+        raise RuntimeError(f'Published-posts queue is missing: {POSTS_FILE}') from e
+    except (OSError, json.JSONDecodeError) as e:
+        raise RuntimeError(f'Published-posts queue cannot be loaded: {POSTS_FILE}') from e
+    if not isinstance(data, list):
+        raise RuntimeError('Published-posts queue root must be a JSON list')
+    for index, item in enumerate(data):
+        if not isinstance(item, dict):
+            raise RuntimeError(f'Published-posts queue item {index} must be a JSON object')
+    return data
+
+def save_published_posts(posts: List[Dict[str, Any]]) -> None:
+    atomic_write_json(POSTS_FILE, posts)
+
+def load_stats() -> Dict[str, Any]:
+    data = load_json_file(STATS_FILE, {'success': 0, 'errors': [], 'accounts_status': {}, 'groups_status': {}})
+    if not isinstance(data, dict):
+        data = {}
+    data.setdefault('success', 0)
+    data.setdefault('errors', [])
+    data.setdefault('accounts_status', {})
+    data.setdefault('groups_status', {})
+    return data
+
+def save_stats(stats: Dict[str, Any]) -> None:
+    atomic_write_json(STATS_FILE, stats)
+
+def load_state() -> Dict[str, Any]:
+    data = load_json_file(STATE_FILE, {'account_index': 0, 'group_index': 0, 'account_cooldowns': {}})
+    if not isinstance(data, dict):
+        data = {}
+    data.setdefault('account_index', 0)
+    data.setdefault('group_index', 0)
+    data.setdefault('account_cooldowns', {})
+    return data
+
+def save_state(state: Dict[str, Any]) -> None:
+    atomic_write_json(STATE_FILE, state)
+
+def add_error_stat(account_id: Any, group_id: Optional[int], error_type: str, error_text: str, error_code: Optional[int]=None) -> None:
+    stats = load_stats()
+    stats['errors'].append({'time': datetime.now().isoformat(timespec='seconds'), 'group': group_id, 'account': account_id, 'type': error_type, 'code': error_code, 'error': error_text})
+    stats['errors'] = stats['errors'][-200:]
+    save_stats(stats)
+
+def set_account_status(account_id: Any, status: str) -> None:
+    stats = load_stats()
+    stats['accounts_status'][str(account_id)] = {'status': status, 'updated_at': datetime.now().isoformat(timespec='seconds')}
+    save_stats(stats)
+
+def set_group_status(group_id: int, status: str) -> None:
+    stats = load_stats()
+    stats['groups_status'][str(group_id)] = {'status': status, 'updated_at': datetime.now().isoformat(timespec='seconds')}
+    save_stats(stats)
+
+def increment_success(account_id: Any, group_id: int) -> None:
+    stats = load_stats()
+    stats['success'] = int(stats.get('success', 0)) + 1
+    stats['accounts_status'][str(account_id)] = {'status': 'OK', 'updated_at': datetime.now().isoformat(timespec='seconds')}
+    stats['groups_status'][str(group_id)] = {'status': 'OK', 'updated_at': datetime.now().isoformat(timespec='seconds')}
+    save_stats(stats)
+
+def check_pause() -> bool:
+    """Возвращает True, если публикации поставлены на паузу."""
+    return os.path.exists(PAUSE_FILE)
+
+def smart_sleep(seconds: int) -> None:
+    """Сон небольшими шагами без блокировки процесса надолго."""
+    end_time = time.monotonic() + max(0, seconds)
+    while time.monotonic() < end_time:
+        remaining = end_time - time.monotonic()
+        time.sleep(min(1.0, max(0.0, remaining)))
+
+def create_vk_api(token: str):
+    session = vk_api.VkApi(token=token, api_version='5.199')
+    return session.get_api()
+
+def vk_call_with_retry(func, *args, **kwargs):
+    """Повторяет только системные/сетевые ошибки. ApiError отдаёт вызывающему коду."""
+    last_error = None
+    for attempt in range(1, NETWORK_RETRIES + 1):
+        try:
+            return func(*args, **kwargs)
+        except vk_api.exceptions.ApiError:
+            raise
+        except Exception as e:
+            last_error = e
+            if attempt >= NETWORK_RETRIES:
+                raise
+            delay = min(2 ** attempt, 10)
+            logger.warning('Сетевая/системная ошибка VK. Попытка %s/%s: %s. Повтор через %s сек.', attempt, NETWORK_RETRIES, e, delay)
+            time.sleep(delay)
+    raise last_error
+
+def check_post_status(vk, owner_id: int, post_id: int) -> str:
+    try:
+        response = vk_call_with_retry(vk.wall.getById, posts=f'{owner_id}_{post_id}')
+        if response:
+            return 'published'
+        return 'not_found'
+    except vk_api.exceptions.ApiError as e:
+        logger.warning('VK API при проверке поста %s_%s: Error %s: %s', owner_id, post_id, e.code, e)
+        if e.code == 9:
+            return 'flood'
+        return 'error'
+    except Exception as e:
+        logger.warning('Ошибка проверки поста %s_%s: %s', owner_id, post_id, e)
+        return 'error'
+
+def generate_dates() -> str:
+    today = datetime.now()
+    dates = [today + timedelta(days=i) for i in range(3)]
+    if dates[0].month != dates[-1].month:
+        return ', '.join((f'{date.day} {MONTHS_RU[date.month - 1]}' for date in dates))
+    month_name = MONTHS_RU[today.month - 1]
+    variant_1 = ', '.join((str(date.day) for date in dates)) + f' {month_name}'
+    variant_2 = f'{dates[0].day}-{dates[-1].day} {month_name}'
+    return random.choice([variant_1, variant_2])
+
+def account_key(account: Dict[str, Any], index: int) -> str:
+    return str(account.get('user_id', f'index_{index}'))
+
+def is_account_in_cooldown(state: Dict[str, Any], account: Dict[str, Any], index: int) -> bool:
+    key = account_key(account, index)
+    value = state.get('account_cooldowns', {}).get(key)
+    if not value:
+        return False
+    try:
+        until = datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        state['account_cooldowns'].pop(key, None)
+        return False
+    if datetime.now() >= until:
+        state['account_cooldowns'].pop(key, None)
+        save_state(state)
+        return False
+    return True
+
+def set_account_cooldown(state: Dict[str, Any], account: Dict[str, Any], index: int, seconds: int) -> None:
+    key = account_key(account, index)
+    until = datetime.now() + timedelta(seconds=seconds)
+    state.setdefault('account_cooldowns', {})[key] = until.isoformat()
+    save_state(state)
+    logger.warning('Аккаунт %s отправлен в cooldown до %s', account.get('user_id', key), until.strftime('%Y-%m-%d %H:%M:%S'))
+
+def is_account_runtime_ready(account: Any) -> bool:
+    """
+    Offline fail-closed runtime validation.
+
+    This function MUST NOT call VK API.
+    """
+    if not isinstance(account, dict):
+        return False
+    if account.get('enabled') is not True:
+        return False
+    user_id = account.get('user_id')
+    if isinstance(user_id, bool):
+        return False
+    try:
+        normalized_user_id = int(str(user_id).strip())
+    except (TypeError, ValueError):
+        return False
+    if normalized_user_id <= 0:
+        return False
+    token = account.get('token')
+    if not isinstance(token, str) or not token.strip():
+        return False
+    phone = account.get('phone')
+    if not isinstance(phone, str) or not phone.strip():
+        return False
+    return True
+
+def get_next_available_account(accounts: List[Dict[str, Any]], state: Dict[str, Any]) -> Optional[tuple]:
+    if not accounts:
+        return None
+    start_index = int(state.get('account_index', 0)) % len(accounts)
+    for offset in range(len(accounts)):
+        index = (start_index + offset) % len(accounts)
+        account = accounts[index]
+        if not is_account_runtime_ready(account):
+            continue
+        if not is_account_in_cooldown(state, account, index):
+            return (index, account)
+    return None
+
+def resolve_token_for_post(post: Dict[str, Any], accounts: List[Dict[str, Any]]) -> Optional[str]:
+    """
+    Задачи удаления используют только account_user_id.
+
+    Legacy account_token намеренно больше не используется:
+    старые записи должны находиться вне активной очереди.
+    """
+    account_user_id = post.get('account_user_id')
+    if account_user_id is None:
+        return None
+    for account in accounts:
+        if str(account.get('user_id')) == str(account_user_id):
+            return account.get('token')
+    return None
+
+def cleanup_deleted_posts(posts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    cutoff = datetime.now() - timedelta(hours=DELETED_POST_RETENTION_HOURS)
+    result = []
+    for post in posts:
+        if post.get('status') != 'deleted':
+            result.append(post)
+            continue
+        deleted_at_raw = post.get('deleted_at')
+        if not deleted_at_raw:
+            continue
+        try:
+            deleted_at = datetime.fromisoformat(deleted_at_raw)
+        except (TypeError, ValueError):
+            continue
+        if deleted_at >= cutoff:
+            result.append(post)
+    return result
+
+def check_and_delete_old_posts(accounts: Optional[List[Dict[str, Any]]]=None) -> None:
+    """
+    Безопасная обработка очереди удаления.
+
+    Lock discipline:
+    - short POSTS SH snapshot, then release it;
+    - never acquire ACCOUNT while a POSTS lock is held;
+    - VK work runs under ACCOUNT SH;
+    - successful remote result is committed under POSTS EX
+      while the same ACCOUNT SH is still held;
+    - commit reloads the queue and conditionally updates only
+      the exact post identity;
+    - cleanup uses a standalone POSTS EX section.
+
+    - только account_user_id;
+    - максимум 3 задачи за проход;
+    - Error 9 включает глобальный persistent backoff на 15 минут;
+    - во время backoff VK API для удаления вообще не вызывается.
+    """
+
+    # Глобальная блокировка старого механизма удаления.
+    from pathlib import Path as _DeleteGuardPath
+    if _DeleteGuardPath("/opt/vkbot/runtime/production.stop").exists():
+        logger.info("Старое удаление заблокировано: production.stop")
+        return
+
+    logger.info('Проверка очереди удаления постов...')
+    state = load_state()
+    now = datetime.now()
+    backoff_raw = state.get('delete_backoff_until')
+    if backoff_raw:
+        try:
+            backoff_until = datetime.fromisoformat(backoff_raw)
+        except (TypeError, ValueError):
+            state.pop('delete_backoff_until', None)
+            save_state(state)
+        else:
+            if now < backoff_until:
+                remaining = max(1, int((backoff_until - now).total_seconds()))
+                logger.info('Удаление находится в global backoff ещё %s сек. VK API не вызывается.', remaining)
+                return
+            state.pop('delete_backoff_until', None)
+            save_state(state)
+    if accounts is None:
+        config = load_config()
+        accounts = [acc for acc in config['vk_accounts'] if is_account_runtime_ready(acc)]
+    with published_posts_shared():
+        snapshot_posts = load_published_posts()
+    if not snapshot_posts:
+        logger.info('Очередь удаления пуста.')
+        return
+    settings = load_settings()
+    delete_delay = timedelta(minutes=settings['delete_delay'])
+    max_tasks_per_run = 3
+    request_pause_seconds = 2.0
+    flood_backoff_seconds = 15 * 60
+    deleted_count = 0
+    committed_count = 0
+    attempted_count = 0
+    flood_stopped = False
+    for post in snapshot_posts:
+        if attempted_count >= max_tasks_per_run:
+            logger.info('Достигнут лимит обработки удаления за проход: %s задач.', max_tasks_per_run)
+            break
+        if not isinstance(post, dict):
+            continue
+        if post.get('status') == 'deleted':
+            continue
+        created_at_raw = post.get('created_at') or post.get('published_on_wall_at')
+        try:
+            created_at = datetime.fromisoformat(created_at_raw)
+        except (TypeError, ValueError):
+            logger.warning('У поста %s_%s нет корректного created_at. Пропускаем.', post.get('owner_id'), post.get('post_id'))
+            continue
+        if now - created_at < delete_delay:
+            continue
+        account_user_id = post.get('account_user_id')
+        try:
+            owner_id = int(post['owner_id'])
+            post_id = int(post['post_id'])
+        except (KeyError, TypeError, ValueError):
+            logger.warning('Некорректная задача удаления: owner_id=%r post_id=%r', post.get('owner_id'), post.get('post_id'))
+            continue
+        original_status = post.get('status', 'pending')
+        with account_lifecycle_shared(account_user_id):
+            fresh_delete_account = get_fresh_runtime_account(account_user_id)
+            if fresh_delete_account is None:
+                logger.warning('DELETE DEFERRED | Post %s_%s | account_user_id %s отсутствует, выключен или не готов к VK API.', owner_id, post_id, account_user_id)
+                continue
+            token = fresh_delete_account['token']
+            if not token:
+                logger.warning('Для задачи %s_%s не найден активный account_user_id/token. VK API не вызывается.', owner_id, post_id)
+                continue
+            attempted_count += 1
+            result = None
+            try:
+                vk = create_vk_api(token)
+                status = check_post_status(vk, owner_id, post_id)
+                if status == 'not_found':
+                    result = {'status': 'deleted', 'deleted_at': datetime.now().isoformat(timespec='seconds'), 'delete_result': 'already_missing'}
+                elif status == 'published':
+                    vk_call_with_retry(vk.wall.delete, owner_id=owner_id, post_id=post_id)
+                    result = {'status': 'deleted', 'deleted_at': datetime.now().isoformat(timespec='seconds'), 'delete_result': 'deleted_by_bot'}
+                    logger.info('Удалён пост %s из группы %s', post_id, owner_id)
+                elif status == 'flood':
+                    flood_stopped = True
+                    backoff_until = datetime.now() + timedelta(seconds=flood_backoff_seconds)
+                    state = load_state()
+                    state['delete_backoff_until'] = backoff_until.isoformat(timespec='seconds')
+                    save_state(state)
+                    logger.warning('VK Flood control при удалении. Global backoff установлен до %s.', backoff_until.isoformat(timespec='seconds'))
+                if result is not None:
+                    with published_posts_exclusive():
+                        current_posts = load_published_posts()
+                        matches = []
+                        for current_post in current_posts:
+                            if not isinstance(current_post, dict):
+                                continue
+                            try:
+                                current_owner_id = int(current_post.get('owner_id'))
+                                current_post_id = int(current_post.get('post_id'))
+                            except (TypeError, ValueError):
+                                continue
+                            if current_owner_id == owner_id and current_post_id == post_id and (str(current_post.get('account_user_id')) == str(account_user_id)):
+                                matches.append(current_post)
+                        if len(matches) != 1:
+                            logger.warning('DELETE COMMIT SKIPPED | Post %s_%s | expected exactly one queue entry, found %s.', owner_id, post_id, len(matches))
+                        else:
+                            current_post = matches[0]
+                            current_status = current_post.get('status', 'pending')
+                            if current_status != original_status:
+                                logger.warning('DELETE COMMIT SKIPPED | Post %s_%s | queue status changed concurrently from %r to %r.', owner_id, post_id, original_status, current_status)
+                            else:
+                                current_post['status'] = result['status']
+                                current_post['deleted_at'] = result['deleted_at']
+                                current_post['delete_result'] = result['delete_result']
+                                save_published_posts(current_posts)
+                                committed_count += 1
+                                deleted_count += 1
+                if flood_stopped:
+                    break
+                time.sleep(request_pause_seconds)
+            except vk_api.exceptions.ApiError as e:
+                logger.warning('Не удалось удалить %s_%s: VK Error %s: %s', owner_id, post_id, e.code, e)
+                if e.code == 9:
+                    flood_stopped = True
+                    backoff_until = datetime.now() + timedelta(seconds=flood_backoff_seconds)
+                    state = load_state()
+                    state['delete_backoff_until'] = backoff_until.isoformat(timespec='seconds')
+                    save_state(state)
+                    logger.warning('VK Error 9 при удалении. Global backoff установлен до %s.', backoff_until.isoformat(timespec='seconds'))
+                    break
+                time.sleep(request_pause_seconds)
+            except Exception as e:
+                logger.exception('Ошибка удаления %s_%s: %s', owner_id, post_id, e)
+                time.sleep(request_pause_seconds)
+    with published_posts_exclusive():
+        current_posts = load_published_posts()
+        cleaned = cleanup_deleted_posts(current_posts)
+        if len(cleaned) != len(current_posts):
+            save_published_posts(cleaned)
+        queue_size = len(cleaned)
+    logger.info('Проверка удаления завершена. Попыток: %s. Удалено/закрыто и подтверждено: %s. Локально подтверждено: %s. В очереди: %s. Flood-stop: %s', attempted_count, deleted_count, committed_count, queue_size, flood_stopped)
+
+def assert_publication_queue_healthy():
+    with published_posts_exclusive():
+        load_published_posts()
+
+def recover_confirmed_publications() -> Dict[str, int]:
+    """
+    Recover durable CONFIRMED operations locally.
+
+    Never calls VK.
+    Never republishes INTENT or UNCERTAIN.
+    JOURNAL and POSTS locks are not nested.
+    """
+    events = load_events(PUBLICATION_JOURNAL_PATH, PUBLICATION_JOURNAL_LOCK_PATH)
+    latest = latest_by_operation(events)
+    stats = {'confirmed_seen': 0, 'queue_inserted': 0, 'already_present': 0, 'committed': 0, 'commit_race_already_done': 0}
+    for operation_id, event in latest.items():
+        if event.get('event') != 'CONFIRMED':
+            continue
+        stats['confirmed_seen'] += 1
+        try:
+            owner_id = int(event['owner_id'])
+            post_id = int(event['post_id'])
+        except (KeyError, TypeError, ValueError) as e:
+            raise RuntimeError(f'Invalid CONFIRMED identity for operation {operation_id}') from e
+        operation_events = [item for item in events if item.get('operation_id') == operation_id]
+        intents = [item for item in operation_events if item.get('event') == 'INTENT']
+        if len(intents) != 1:
+            raise RuntimeError(f'Expected exactly one INTENT for operation {operation_id}')
+        intent = intents[0]
+        raw_account_user_id = intent.get('account_user_id')
+        if isinstance(raw_account_user_id, bool):
+            raise RuntimeError('Invalid INTENT account_user_id')
+        try:
+            intent_owner_id = int(intent['owner_id'])
+            account_user_id = int(raw_account_user_id)
+        except (KeyError, TypeError, ValueError) as e:
+            raise RuntimeError(f'Invalid INTENT identity for operation {operation_id}') from e
+        if account_user_id <= 0:
+            raise RuntimeError('Invalid INTENT account_user_id')
+        if intent_owner_id != owner_id:
+            raise RuntimeError(f'INTENT/CONFIRMED owner mismatch for operation {operation_id}')
+        inserted = False
+        with published_posts_exclusive():
+            posts = load_published_posts()
+            matches = []
+            for index, post in enumerate(posts):
+                try:
+                    queue_owner_id = int(post['owner_id'])
+                    queue_post_id = int(post['post_id'])
+                except (KeyError, TypeError, ValueError) as e:
+                    raise RuntimeError(f'Invalid queue identity at index {index}') from e
+                if queue_owner_id == owner_id and queue_post_id == post_id:
+                    matches.append((index, post))
+            if len(matches) > 1:
+                raise RuntimeError(f'Duplicate queue identity owner_id={owner_id}, post_id={post_id}')
+            if len(matches) == 1:
+                index, existing = matches[0]
+                raw_existing_account = existing.get('account_user_id')
+                if isinstance(raw_existing_account, bool):
+                    raise RuntimeError(f'Invalid queue account_user_id at index {index}')
+                try:
+                    existing_account = int(raw_existing_account)
+                except (TypeError, ValueError) as e:
+                    raise RuntimeError(f'Invalid queue account_user_id at index {index}') from e
+                if existing_account <= 0:
+                    raise RuntimeError(f'Invalid queue account_user_id at index {index}')
+                if existing_account != account_user_id:
+                    raise RuntimeError(f'Queue account identity does not match journal for operation {operation_id}')
+                if existing.get('status') != 'pending':
+                    raise RuntimeError(f'Recovered queue record is not pending for operation {operation_id}')
+            else:
+                posts.append({'owner_id': owner_id, 'post_id': post_id, 'created_at': datetime.now().isoformat(timespec='seconds'), 'status': 'pending', 'account_user_id': account_user_id})
+                save_published_posts(posts)
+                inserted = True
+        try:
+            append_event(PUBLICATION_JOURNAL_PATH, PUBLICATION_JOURNAL_LOCK_PATH, make_committed(operation_id=operation_id, owner_id=owner_id, post_id=post_id))
+        except RuntimeError:
+            fresh_events = load_events(PUBLICATION_JOURNAL_PATH, PUBLICATION_JOURNAL_LOCK_PATH)
+            fresh_latest = latest_by_operation(fresh_events).get(operation_id)
+            if fresh_latest is None or fresh_latest.get('event') != 'COMMITTED':
+                raise
+            try:
+                fresh_owner_id = int(fresh_latest['owner_id'])
+                fresh_post_id = int(fresh_latest['post_id'])
+            except (KeyError, TypeError, ValueError):
+                raise
+            if fresh_owner_id != owner_id or fresh_post_id != post_id:
+                raise
+            stats['commit_race_already_done'] += 1
+        if inserted:
+            stats['queue_inserted'] += 1
+        else:
+            stats['already_present'] += 1
+        stats['committed'] += 1
+        logger.info('PUBLICATION RECOVERY COMMITTED | Operation %s | Group %s | Post %s | Queue inserted=%s', operation_id, owner_id, post_id, inserted)
+    return stats
+
+def save_new_post(owner_id: int, post_id: int, account: Dict[str, Any]) -> None:
+    with published_posts_exclusive():
+        posts = load_published_posts()
+        posts.append({'owner_id': owner_id, 'post_id': post_id, 'created_at': datetime.now().isoformat(timespec='seconds'), 'status': 'pending', 'account_user_id': account.get('user_id')})
+        save_published_posts(posts)
+
+def classify_api_error(code: int) -> str:
+    if code in AUTH_ERROR_CODES:
+        return 'auth'
+    if code == 214:
+        return 'group_limit'
+    if code in ACCOUNT_COOLDOWN_ERROR_CODES:
+        return 'temporary_account'
+    return 'api'
+
+def handle_vk_api_error(e: vk_api.exceptions.ApiError, account: Dict[str, Any], account_index: int, group_id: int, state: Dict[str, Any]) -> None:
+    error_type = classify_api_error(e.code)
+    account_id = account.get('user_id', account_index)
+    logger.warning('VK Error %s | Account %s | Group %s | %s', e.code, account_id, group_id, e)
+    add_error_stat(account_id=account_id, group_id=group_id, error_type=error_type, error_text=str(e), error_code=e.code)
+    if error_type == 'auth':
+        set_account_status(account_id, f'AUTH_ERROR_{e.code}')
+        set_account_cooldown(state, account, account_index, 6 * 60 * 60)
+    elif error_type == 'temporary_account':
+        set_account_status(account_id, f'TEMP_ERROR_{e.code}')
+        set_account_cooldown(state, account, account_index, DEFAULT_ACCOUNT_COOLDOWN_SECONDS)
+    elif error_type == 'group_limit':
+        set_group_status(group_id, 'LIMIT_214')
+    else:
+        set_group_status(group_id, f'VK_ERROR_{e.code}')
+
+def get_fresh_runtime_account(user_id: Any) -> Optional[Dict[str, Any]]:
+    """
+    Reload config.json and return the current runtime-ready
+    account matching user_id.
+
+    Fail closed. No VK API calls.
+    """
+    if isinstance(user_id, bool):
+        return None
+    try:
+        normalized_user_id = int(str(user_id).strip())
+    except (TypeError, ValueError):
+        return None
+    if normalized_user_id <= 0:
+        return None
+    try:
+        fresh_config = load_config()
+    except Exception:
+        logger.exception('Не удалось перечитать config.json перед VK-действием | Account %s', normalized_user_id)
+        return None
+    accounts = fresh_config.get('vk_accounts', [])
+    if not isinstance(accounts, list):
+        return None
+    matches = []
+    for candidate in accounts:
+        if not isinstance(candidate, dict):
+            continue
+        candidate_id = candidate.get('user_id')
+        if isinstance(candidate_id, bool):
+            continue
+        try:
+            candidate_id = int(str(candidate_id).strip())
+        except (TypeError, ValueError):
+            continue
+        if candidate_id == normalized_user_id:
+            matches.append(candidate)
+    if len(matches) != 1:
+        return None
+    fresh_account = matches[0]
+    if not is_account_runtime_ready(fresh_account):
+        return None
+    return fresh_account
+
+def publish_one_post(account: Dict[str, Any], account_index: int, group_id: int, messages: List[str], state: Dict[str, Any]) -> bool:
+    account_id = account.get('user_id', account_index)
+    with account_lifecycle_shared(account_id):
+        fresh_account = get_fresh_runtime_account(account_id)
+        if fresh_account is None:
+            logger.warning('PUBLISH CANCELLED | Account %s больше не существует, выключен или не готов к VK API.', account_id)
+            return False
+        account = fresh_account
+        account_id = account['user_id']
+        operation_id = None
+        publication_state = 'PRE_INTENT'
+        try:
+            vk = create_vk_api(account['token'])
+            random_message = random.choice(messages)
+            account_phone = account.get('phone', 'Не указан')
+            current_dates = generate_dates()
+            final_message = random_message.replace('{PHONE}', str(account_phone)).replace('{DATES}', current_dates)
+            operation_id = new_operation_id()
+            publication_state = 'INTENT_PENDING'
+            append_event(PUBLICATION_JOURNAL_PATH, PUBLICATION_JOURNAL_LOCK_PATH, make_intent(operation_id=operation_id, account_user_id=account_id, owner_id=group_id, message=final_message))
+            publication_state = 'INTENT_DURABLE'
+            publication_state = 'REMOTE_ATTEMPTED'
+            # Глобальная блокировка старой автопубликации.
+            from pathlib import Path as _PublishGuardPath
+            if _PublishGuardPath("/opt/vkbot/runtime/production.stop").exists():
+                logger.warning("Старая публикация заблокирована: production.stop")
+                return
+
+            response = vk.wall.post(owner_id=group_id, message=final_message)
+            post_id = int(response['post_id'])
+            append_event(PUBLICATION_JOURNAL_PATH, PUBLICATION_JOURNAL_LOCK_PATH, make_confirmed(operation_id=operation_id, owner_id=group_id, post_id=post_id))
+            publication_state = 'CONFIRMED_DURABLE'
+            save_new_post(owner_id=group_id, post_id=post_id, account=account)
+            append_event(PUBLICATION_JOURNAL_PATH, PUBLICATION_JOURNAL_LOCK_PATH, make_committed(operation_id=operation_id, owner_id=group_id, post_id=post_id))
+            publication_state = 'COMMITTED_DURABLE'
+            try:
+                increment_success(account_id, group_id)
+            except Exception:
+                logger.exception('POST-COMMIT STATS ERROR | Operation %s | Account %s | Group %s', operation_id, account_id, group_id)
+            logger.info('POSTED | Account %s | Group %s | Post ID %s | Phone %s | Dates %s | Operation %s', account_id, group_id, post_id, account_phone, current_dates, operation_id)
+            return True
+        except KeyError as e:
+            if operation_id is not None:
+                try:
+                    if publication_state == 'REMOTE_ATTEMPTED':
+                        append_event(PUBLICATION_JOURNAL_PATH, PUBLICATION_JOURNAL_LOCK_PATH, make_uncertain(operation_id=operation_id, error_type='KeyError'))
+                    elif publication_state == 'INTENT_DURABLE':
+                        append_event(PUBLICATION_JOURNAL_PATH, PUBLICATION_JOURNAL_LOCK_PATH, make_failed(operation_id=operation_id, error_type='KeyError'))
+                    elif publication_state == 'CONFIRMED_DURABLE':
+                        logger.error('LOCAL FAILURE AFTER CONFIRMED | Operation %s remains CONFIRMED for recovery', operation_id)
+                except Exception:
+                    logger.exception('PUBLICATION JOURNAL WRITE ERROR | Operation %s', operation_id)
+            logger.error('В аккаунте %s отсутствует поле %s', account_id, e)
+            set_account_status(account_id, 'CONFIG_ERROR')
+            return False
+        except vk_api.exceptions.ApiError as e:
+            if operation_id is not None:
+                try:
+                    if publication_state in {'INTENT_DURABLE', 'REMOTE_ATTEMPTED'}:
+                        append_event(PUBLICATION_JOURNAL_PATH, PUBLICATION_JOURNAL_LOCK_PATH, make_failed(operation_id=operation_id, error_type='ApiError'))
+                    elif publication_state == 'CONFIRMED_DURABLE':
+                        logger.error('LOCAL/API FAILURE AFTER CONFIRMED | Operation %s remains CONFIRMED for recovery', operation_id)
+                except Exception:
+                    logger.exception('PUBLICATION JOURNAL WRITE ERROR | Operation %s', operation_id)
+            handle_vk_api_error(e=e, account=account, account_index=account_index, group_id=group_id, state=state)
+            return False
+        except Exception as e:
+            if operation_id is not None:
+                try:
+                    if publication_state == 'REMOTE_ATTEMPTED':
+                        append_event(PUBLICATION_JOURNAL_PATH, PUBLICATION_JOURNAL_LOCK_PATH, make_uncertain(operation_id=operation_id, error_type=type(e).__name__))
+                    elif publication_state == 'INTENT_DURABLE':
+                        append_event(PUBLICATION_JOURNAL_PATH, PUBLICATION_JOURNAL_LOCK_PATH, make_failed(operation_id=operation_id, error_type=type(e).__name__))
+                    elif publication_state == 'CONFIRMED_DURABLE':
+                        logger.error('LOCAL FAILURE AFTER CONFIRMED | Operation %s remains CONFIRMED for recovery', operation_id)
+                except Exception:
+                    logger.exception('PUBLICATION JOURNAL WRITE ERROR | Operation %s', operation_id)
+            logger.exception('Системная/сетевая ошибка | Account %s | Group %s: %s', account_id, group_id, e)
+            add_error_stat(account_id=account_id, group_id=group_id, error_type='system', error_text=str(e))
+            set_account_cooldown(state, account, account_index, 5 * 60)
+            return False
+
+def main() -> None:
+    logger.info('=' * 70)
+    logger.info('Запуск VK Bot v2')
+    logger.info('=' * 70)
+    config = load_config()
+    accounts = [acc for acc in config['vk_accounts'] if is_account_runtime_ready(acc)]
+    excel_file = config['settings']['excel_file']
+    groups = load_groups(excel_file)
+    messages = load_messages('messages.xlsx')
+    if not accounts:
+        logger.warning('Нет включённых VK-аккаунтов. Запуск в режиме ожидания аккаунтов.')
+    if not groups:
+        logger.error('Список групп пуст.')
+        return
+    if not messages:
+        logger.error('Список сообщений пуст.')
+        return
+    state = load_state()
+    try:
+        assert_publication_queue_healthy()
+    except Exception:
+        logger.exception('PUBLICATION QUEUE UNHEALTHY AT STARTUP | startup blocked')
+        return
+    recovery_stats = recover_confirmed_publications()
+    logger.info('PUBLICATION STARTUP RECOVERY | Confirmed=%s | Inserted=%s | Existing=%s | Committed=%s | CommitRace=%s', recovery_stats['confirmed_seen'], recovery_stats['queue_inserted'], recovery_stats['already_present'], recovery_stats['committed'], recovery_stats['commit_race_already_done'])
+    logger.info('Готово к работе. Аккаунтов: %s | Групп: %s | Текстов: %s', len(accounts), len(groups), len(messages))
+    try:
+        check_and_delete_old_posts(accounts)
+    except Exception:
+        logger.exception('Ошибка стартовой проверки удаления')
+    finally:
+        state = load_state()
+    startup_settings = load_settings()
+    delete_check_period = min(startup_settings['check_interval'], 60)
+    next_delete_check = time.monotonic() + delete_check_period
+    while True:
+        try:
+            settings = load_settings()
+            if time.monotonic() >= next_delete_check:
+                try:
+                    check_and_delete_old_posts(accounts)
+                    state = load_state()
+                except Exception:
+                    logger.exception('Ошибка плановой проверки удаления')
+                delete_check_period = min(settings['check_interval'], 60)
+                next_delete_check = time.monotonic() + delete_check_period
+            if check_pause():
+                time.sleep(1)
+                continue
+            try:
+                fresh_config = load_config()
+                accounts = [acc for acc in fresh_config['vk_accounts'] if is_account_runtime_ready(acc)]
+            except Exception:
+                logger.exception('Не удалось перечитать VK-аккаунты из config.json. Публикация пропущена.')
+                smart_sleep(30)
+                continue
+            if not accounts:
+                logger.info('Режим ожидания: включённых VK-аккаунтов нет. VK API не вызывается.')
+                smart_sleep(30)
+                continue
+            available = get_next_available_account(accounts, state)
+            if available is None:
+                logger.warning('Все включённые VK-аккаунты находятся в cooldown. VK API не вызывается. Повторная проверка через 60 секунд.')
+                smart_sleep(60)
+                continue
+            account_index, account = available
+            group_index = int(state.get('group_index', 0)) % len(groups)
+            group_id = groups[group_index]
+            logger.info('-' * 70)
+            logger.info('Account %s/%s: %s | Group %s/%s: %s', account_index + 1, len(accounts), account.get('user_id', account_index), group_index + 1, len(groups), group_id)
+            try:
+                assert_publication_queue_healthy()
+            except Exception:
+                logger.exception('PUBLICATION QUEUE UNHEALTHY | publishing blocked')
+                smart_sleep(30)
+                continue
+            publish_one_post(account=account, account_index=account_index, group_id=group_id, messages=messages, state=state)
+            state['account_index'] = (account_index + 1) % len(accounts)
+            state['group_index'] = (group_index + 1) % len(groups)
+            save_state(state)
+            smart_sleep(load_settings()['post_interval'])
+        except KeyboardInterrupt:
+            logger.info('Получен KeyboardInterrupt. Завершение работы.')
+            break
+        except Exception as e:
+            logger.exception('Критическая ошибка основного цикла: %s', e)
+            time.sleep(30)
+if __name__ == '__main__':
+    main()
