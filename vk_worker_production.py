@@ -28,7 +28,34 @@ import time
 # ============================================================
 
 BASE = Path("/opt/vkbot")
-PROFILE = BASE / "VKBotChromeServer"
+
+def resolve_worker_profile(default_profile, environment=None):
+    """Выбирает профиль, переданный диспетчером."""
+    import os
+
+    env = os.environ if environment is None else environment
+    supplied = env.get("VKBOT_PROFILE")
+
+    if supplied is None:
+        return Path(default_profile)
+
+    if not isinstance(supplied, str) or not supplied.strip():
+        raise ValueError("INVALID_VKBOT_PROFILE")
+
+    candidate = Path(supplied.strip()).expanduser()
+
+    if not candidate.is_absolute():
+        raise ValueError("VKBOT_PROFILE_MUST_BE_ABSOLUTE")
+
+    candidate = candidate.resolve(strict=False)
+
+    if not candidate.is_dir():
+        raise ValueError("VKBOT_PROFILE_DIRECTORY_MISSING")
+
+    return candidate
+
+
+PROFILE = resolve_worker_profile(BASE / "VKBotChromeServer")
 GROUPS_FILE = BASE / "groups.txt"
 STATE_FILE = BASE / "vk_worker_production_state.json"
 LOG_FILE = BASE / "vk_worker_production.log"
@@ -97,6 +124,51 @@ class WorkerStop(RuntimeError):
     pass
 
 
+def verify_assigned_vk_identity(page):
+    """Fail closed if the active VK profile differs from the assigned account."""
+    import os
+    import sqlite3
+
+    account_id_raw = os.environ.get("VKBOT_ACCOUNT_ID", "")
+    if not account_id_raw.isdecimal() or int(account_id_raw) <= 0:
+        raise WorkerStop("VK_IDENTITY_ACCOUNT_NOT_ASSIGNED")
+
+    account_id = int(account_id_raw)
+
+    from vk_account_auth import verified_self_id
+    import vk_multi_account as multi
+
+    db_path = getattr(multi, "DB_FILE", None)
+    if db_path is None:
+        raise WorkerStop("VK_IDENTITY_DATABASE_NOT_CONFIGURED")
+
+    try:
+        with sqlite3.connect(f"file:{Path(db_path).resolve()}?mode=ro", uri=True) as con:
+            row = con.execute(
+                "SELECT vk_user_id FROM account_verified_identity "
+                "WHERE account_id=?",
+                (account_id,),
+            ).fetchone()
+    except (sqlite3.Error, OSError, ValueError) as exc:
+        raise WorkerStop(
+            "VK_IDENTITY_DATABASE_ERROR:" + type(exc).__name__
+        ) from None
+
+    if not row or not isinstance(row[0], int) or row[0] <= 0:
+        raise WorkerStop("VK_IDENTITY_NOT_REGISTERED")
+
+    actual_vk_id = verified_self_id(page)
+
+    if actual_vk_id is None:
+        raise WorkerStop("VK_IDENTITY_SESSION_UNVERIFIED")
+
+    if actual_vk_id != row[0]:
+        raise WorkerStop("VK_IDENTITY_MISMATCH")
+
+    log("VK_IDENTITY_MATCH_CONFIRMED")
+    return True
+
+
 def log(msg):
     line = f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}"
     print(line)
@@ -109,7 +181,7 @@ def pause(a=MIN_ACTION_PAUSE_SEC, b=MAX_ACTION_PAUSE_SEC):
 
 
 def generate_dates():
-    ds = [datetime.now() + timedelta(days=i) for i in range(3)]
+    ds = [datetime.now(__import__("zoneinfo").ZoneInfo("Asia/Krasnoyarsk")) + timedelta(days=i) for i in range(3)]
     if ds[0].month == ds[-1].month:
         return ", ".join(str(x.day) for x in ds) + " " + MONTHS_RU[ds[0].month - 1]
     return (
@@ -406,6 +478,33 @@ def dialog_buttons(page, names):
     return found
 
 
+
+def ensure_author_signature(page):
+    """Включает и проверяет подпись автора перед отправкой."""
+    selector = '[data-testid="posting_settings_sign_switch_input"]'
+    switch = page.locator(selector)
+
+    if switch.count() != 1:
+        raise RuntimeError("AUTHOR_SIGNATURE_SWITCH_NOT_UNIQUE")
+
+    if switch.get_attribute("type") != "checkbox":
+        raise RuntimeError("AUTHOR_SIGNATURE_WRONG_ELEMENT")
+
+    state = switch.get_attribute("aria-checked")
+
+    if state == "false":
+        switch.locator("xpath=ancestor::label[1]").click(timeout=5000)
+        page.wait_for_timeout(400)
+    elif state != "true":
+        raise RuntimeError("AUTHOR_SIGNATURE_UNKNOWN_STATE")
+
+    if switch.get_attribute("aria-checked") != "true":
+        raise RuntimeError("AUTHOR_SIGNATURE_NOT_ENABLED")
+
+    log("AUTHOR SIGNATURE ENABLED AND VERIFIED")
+
+
+
 def final_button_suggest(page):
     items = dialog_buttons(page, ["Предложить пост"])
     if len(items) != 1:
@@ -511,6 +610,9 @@ def compare_post_candidates(before, after):
 
 
 def remote_submit(page, state, url, text, flow, button):
+    verify_assigned_vk_identity(page)
+    from vk_registry_bridge import register_before_submit, save_after_submit
+    registry_context = register_before_submit(url, flow)
     # Критическая защита: REMOTE_ATTEMPTED пишется ДО клика.
     update_group(state, url, "INTENT", flow=flow, message=text)
     update_group(state, url, "REMOTE_ATTEMPTED", flow=flow, message=text)
@@ -554,19 +656,93 @@ def remote_submit(page, state, url, text, flow, button):
     try:
         button.click(timeout=10000, no_wait_after=True)
     except Exception as exc:
-        page.remove_listener("response", observer.handle_response)
-        page.remove_listener("request", observer.handle_request)
+        # A failed click may still have reached VK.
+        # Save available network IDs as unverified candidates.
+        try:
+            network_ids = sorted({
+                event["post_id"]
+                for event in observer.events
+                if event.get("post_id_source") == "VK_API_WALL_POST"
+                and type(event.get("post_id")) is int
+                and event["post_id"] > 0
+            })
+            save_after_submit(
+                registry_context, expected_owner_id, [], network_ids
+            )
+        except Exception as save_exc:
+            log(
+                "CLICK_CANDIDATE_SAVE_FAILED:"
+                + type(save_exc).__name__
+            )
+        finally:
+            page.remove_listener("response", observer.handle_response)
+            page.remove_listener("request", observer.handle_request)
+
         update_group(
             state, url, "UNCERTAIN",
-            flow=flow, message=text, error=repr(exc)
+            flow=flow, message=text,
+            error="REMOTE_CLICK_FAILED:" + type(exc).__name__
         )
+        log("STOP: remote click uncertain; NO RETRY")
         return "REMOTE_ATTEMPT"
 
     try:
         result, reason = inspect_submit(page, flow)
+    except Exception as exc:
+        # Remote submit may already have succeeded.
+        # Preserve network candidates without confirming publication.
+        network_ids = sorted({
+            event["post_id"]
+            for event in observer.events
+            if event.get("post_id_source") == "VK_API_WALL_POST"
+            and type(event.get("post_id")) is int
+            and event["post_id"] > 0
+        })
+        try:
+            save_after_submit(
+                registry_context, expected_owner_id, [], network_ids
+            )
+        except Exception as save_exc:
+            log(
+                "NETWORK_CANDIDATE_SAVE_FAILED:"
+                + type(save_exc).__name__
+            )
+        update_group(
+            state, url, "UNCERTAIN",
+            flow=flow, message=text,
+            error="INSPECT_SUBMIT_FAILED:" + type(exc).__name__
+        )
+        log("STOP: inspection failed after remote attempt; NO RETRY")
+        return "REMOTE_ATTEMPT"
     finally:
         page.remove_listener("response", observer.handle_response)
         page.remove_listener("request", observer.handle_request)
+
+    from vk_network_observer import validate_publication_evidence
+
+    network_proof = validate_publication_evidence(
+        observer.events,
+        registry_context[0],
+        registry_context[1],
+        flow,
+        observer.queue_id,
+        observer.account_id,
+    )
+
+    # Полный ID записи — только кандидат для последующей проверки.
+    # Не подтверждает авторство и не разрешает удаление.
+    network_full_post_id = None
+    if (
+        flow == "CREATE"
+        and type(expected_owner_id) is int
+        and expected_owner_id < 0
+        and network_proof.get("matched") is True
+        and type(network_proof.get("post_id")) is int
+        and network_proof["post_id"] > 0
+    ):
+        network_full_post_id = (
+            f"{expected_owner_id}_{network_proof['post_id']}"
+        )
 
     network_summary = observer.summary()
 
@@ -587,20 +763,42 @@ def remote_submit(page, state, url, text, flow, button):
 
     # Сравнение ссылок ДО и ПОСЛЕ отправки.
     # Новые ссылки НЕ являются доказательством авторства.
-    after_candidates = collect_post_candidates(page)
-
-    candidates = compare_post_candidates(
-        before_candidates,
-        after_candidates
-    )
+    try:
+        after_candidates = collect_post_candidates(page)
+        candidates = compare_post_candidates(
+            before_candidates,
+            after_candidates
+        )
+    except Exception as exc:
+        # Page inspection failed after a remote attempt.
+        # Keep network evidence and require manual review.
+        log("POST_SUBMIT_PAGE_INSPECTION_FAILED:" + type(exc).__name__)
+        after_candidates = []
+        candidates = []
+        result = "UNCERTAIN"
+        reason = "POST_SUBMIT_PAGE_INSPECTION_FAILED"
 
     update_group(
         state, url, result,
         flow=flow, message=text, reason=reason,
         post_candidates=candidates,
         network_post_candidates=network_post_candidates,
-        network_publication_verified=False
+        network_publication_verified=False,
+        network_proof_reason=network_proof["reason"],
+        network_proof_post_id=network_proof["post_id"]
     )
+    try:
+        saved_page, saved_network = save_after_submit(
+            registry_context, expected_owner_id,
+            candidates, network_post_candidates,
+        )
+        log(f"UNVERIFIED_CANDIDATES page={saved_page} network={saved_network}")
+    except Exception as exc:
+        # Never repeat a remote attempt after a post-submit persistence error.
+        update_group(state, url, "UNCERTAIN", flow=flow,
+                     message=text, error="CANDIDATE_SAVE_FAILED:" + type(exc).__name__)
+        log("CANDIDATE_SAVE_FAILED: manual review required; no retry")
+        return "REMOTE_ATTEMPT"
     log(f"{flow}: RESULT {result} ({reason})")
     return "REMOTE_ATTEMPT"
 
@@ -608,6 +806,7 @@ def remote_submit(page, state, url, text, flow, button):
 def do_suggest(page, state, url, entry, text):
     editor = open_post_editor(page, entry, "SUGGEST")
     fill_and_next(page, editor, text)
+    ensure_author_signature(page)
     btn = final_button_suggest(page)
     log("SUGGEST FINAL BUTTON UNIQUE")
 
@@ -858,9 +1057,21 @@ def assert_runtime_safety():
     if MODE == "PRODUCTION" and not ENABLE_PRODUCTION:
         raise RuntimeError("PRODUCTION_LOCKED")
     if MODE == "PRODUCTION" and ENABLE_CREATE_SUBMIT:
-        raise RuntimeError(
-            "CREATE_PRODUCTION_NOT_APPROVED: CREATE has only passed dry-run"
-        )
+        import os
+        from pathlib import Path
+        queue_id = os.environ.get("VKBOT_QUEUE_ID", "")
+        group_url = os.environ.get("VKBOT_SINGLE_GROUP", "")
+        if not (
+            queue_id
+            and group_url
+            and os.environ.get("VKBOT_REQUESTED_FLOW", "").upper() == "CREATE"
+            and os.environ.get("VKBOT_CREATE_TEST_QUEUE_ID", "") == queue_id
+            and os.environ.get("VKBOT_CREATE_TEST_GROUP", "") == group_url
+            and not Path("/opt/vkbot/runtime/production.stop").exists()
+        ):
+            raise RuntimeError("CREATE_PRODUCTION_NOT_APPROVED")
+
+from account_lifecycle_lock import account_lifecycle_exclusive
 
 def main():
     assert_runtime_safety()
@@ -951,7 +1162,7 @@ def main():
     ctx = None
 
     try:
-        with sync_playwright() as p:
+        with sync_playwright() as p, account_lifecycle_exclusive(account_id):
             ctx = p.chromium.launch_persistent_context(
                 user_data_dir=str(PROFILE),
                 executable_path=CHROME,
@@ -965,6 +1176,9 @@ def main():
             )
 
             page = ctx.pages[0] if ctx.pages else ctx.new_page()
+
+            if MODE == "PRODUCTION":
+                verify_assigned_vk_identity(page)
 
             for i, url in enumerate(groups, 1):
                 log(f"GROUP {i}/{len(groups)}")
@@ -1032,14 +1246,20 @@ def main():
 
                 except WorkerStop as exc:
                     log(f"CRITICAL VK STOP: {exc}")
-                    break
+                    raise
 
                 except Exception as exc:
                     log(f"ERROR {url}: {repr(exc)}")
 
                     current = state["groups"].get(url, {}).get("status")
 
-                    if current == "REMOTE_ATTEMPTED":
+                    if current in (
+                        "REMOTE_ATTEMPTED",
+                        "UNCERTAIN",
+                        "CONFIRMED",
+                        "PENDING_MODERATION",
+                        "PROBABLE",
+                    ):
                         update_group(
                             state, url, "UNCERTAIN",
                             error=repr(exc), message=text

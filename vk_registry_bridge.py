@@ -1,0 +1,65 @@
+"""Only stores unverified VK post candidates; never confirms or deletes."""
+import os
+import re
+from vk_post_identity import extract_post_identity
+from vk_publication_registry import register_attempt, save_post_candidates, save_network_post_candidates
+
+
+def _context():
+    q = os.environ.get("VKBOT_QUEUE_ID")
+    a = os.environ.get("VKBOT_ACCOUNT_ID")
+    if q is None and a is None:
+        return None
+    if not q or not a or not q.isdecimal() or not a.isdecimal() or int(q) <= 0 or int(a) <= 0:
+        raise RuntimeError("INVALID_PUBLICATION_QUEUE_CONTEXT")
+    return int(q), int(a)
+
+
+def register_before_submit(group_url, flow):
+    context = _context()
+    if context is None:
+        raise RuntimeError("PUBLICATION_QUEUE_CONTEXT_REQUIRED")
+    if flow not in ("CREATE", "SUGGEST"):
+        raise RuntimeError("INVALID_PUBLICATION_FLOW")
+    if not re.fullmatch(r"https://(?:vk\.com|vk\.ru)/(?:club|public)[0-9]+/?", str(group_url)):
+        raise RuntimeError("UNRESOLVED_PUBLICATION_GROUP")
+    queue_id, account_id = context
+    register_attempt(queue_id, account_id, group_url, flow, state="REVIEW_REQUIRED")
+    return context
+
+
+def save_after_submit(context, owner_id, page_candidates, network_ids):
+    if context is None:
+        return (0, 0)
+    queue_id, account_id = context
+    # The page may show other people's posts. Store as unverified evidence only.
+    filtered = []
+    for candidate in page_candidates or []:
+        if not isinstance(candidate, dict):
+            continue
+        identity = extract_post_identity(candidate.get("post_url"))
+        if identity and identity["owner_id"] == owner_id:
+            filtered.append(identity)
+    page_count = 0
+    network_count = 0
+    errors = []
+
+    try:
+        page_count = save_post_candidates(queue_id, filtered)
+    except Exception as exc:
+        errors.append(("PAGE", exc))
+
+    try:
+        network_count = save_network_post_candidates(
+            queue_id, account_id, network_ids or [], owner_id=owner_id
+        )
+    except Exception as exc:
+        errors.append(("NETWORK", exc))
+
+    if errors:
+        raise RuntimeError(
+            "CANDIDATE_PERSISTENCE_FAILED:" +
+            ",".join(kind for kind, _ in errors)
+        ) from errors[0][1]
+
+    return page_count, network_count

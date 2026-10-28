@@ -1,0 +1,482 @@
+[2026-10-02 07:08:32] ========================================================================
+[2026-10-02 07:08:32] VK WORKER UNIFIED START MODE=SCAN
+[2026-10-02 07:08:32] GROUPS=100
+[2026-10-02 07:08:32] FLAGS production=False test_submit=False subscribe=False
+[2026-10-02 07:08:34] GROUP 1/100
+[2026-10-02 07:09:32] STATE https://vk.ru/poputchiki19 -> SCAN_ONLY
+[2026-10-02 07:09:32] SCAN https://vk.ru/poputchiki19 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:09:36] GROUP 2/100
+[2026-10-02 07:10:31] STATE https://vk.ru/19kray24 -> SCAN_ONLY
+[2026-10-02 07:10:31] SCAN https://vk.ru/19kray24 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:10:37] GROUP 3/100
+[2026-10-02 07:11:34] STATE https://vk.ru/24kray24 -> SCAN_ONLY
+[2026-10-02 07:11:34] SCAN https://vk.ru/24kray24 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:11:42] GROUP 4/100
+[2026-10-02 07:13:01] STATE https://vk.ru/club149430851 -> SCAN_ONLY
+[2026-10-02 07:13:01] SCAN https://vk.ru/club149430851 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 07:13:09] GROUP 5/100
+[2026-10-02 07:14:01] STATE https://vk.ru/poputkakrasnoyarsk -> SCAN_ONLY
+[2026-10-02 07:14:01] SCAN https://vk.ru/poputkakrasnoyarsk subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:14:05] GROUP 6/100
+[2026-10-02 07:14:54] STATE https://vk.ru/vputi_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 07:14:54] SCAN https://vk.ru/vputi_krasnoyarsk subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:14:58] GROUP 7/100
+[2026-10-02 07:15:51] STATE https://vk.ru/super_laike17 -> SCAN_ONLY
+[2026-10-02 07:15:51] SCAN https://vk.ru/super_laike17 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:15:59] GROUP 8/100
+[2026-10-02 07:16:51] STATE https://vk.ru/poputka_abakan_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 07:16:51] SCAN https://vk.ru/poputka_abakan_krasnoyarsk subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:17:00] GROUP 9/100
+[2026-10-02 07:17:49] STATE https://vk.ru/poputchiki_kyzyl_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 07:17:49] SCAN https://vk.ru/poputchiki_kyzyl_krasnoyarsk subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:17:57] GROUP 10/100
+[2026-10-02 07:18:49] STATE https://vk.ru/poputikansk -> SCAN_ONLY
+[2026-10-02 07:18:49] SCAN https://vk.ru/poputikansk subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:18:55] GROUP 11/100
+[2026-10-02 07:19:56] STATE https://vk.ru/poputka_hakasia -> SCAN_ONLY
+[2026-10-02 07:19:56] SCAN https://vk.ru/poputka_hakasia subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:20:00] GROUP 12/100
+[2026-10-02 07:20:52] STATE https://vk.ru/turistdoska11 -> SCAN_ONLY
+[2026-10-02 07:20:52] SCAN https://vk.ru/turistdoska11 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:20:59] GROUP 13/100
+[2026-10-02 07:21:49] STATE https://vk.ru/passagiry_kyzyl_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 07:21:49] SCAN https://vk.ru/passagiry_kyzyl_krasnoyarsk subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:21:55] GROUP 14/100
+[2026-10-02 07:22:43] STATE https://vk.ru/19abaza -> SCAN_ONLY
+[2026-10-02 07:22:43] SCAN https://vk.ru/19abaza subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:22:50] GROUP 15/100
+[2026-10-02 07:23:39] STATE https://vk.ru/poputchik_krasnoyarsk_abakan -> SCAN_ONLY
+[2026-10-02 07:23:39] SCAN https://vk.ru/poputchik_krasnoyarsk_abakan subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:23:46] GROUP 16/100
+[2026-10-02 07:25:24] STATE https://vk.ru/poputkakzlabakan -> SCAN_ONLY
+[2026-10-02 07:25:24] SCAN https://vk.ru/poputkakzlabakan subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 07:25:29] GROUP 17/100
+[2026-10-02 07:26:09] STATE https://vk.ru/moiapoputka24 -> SCAN_ONLY
+[2026-10-02 07:26:09] SCAN https://vk.ru/moiapoputka24 subscription=SUBSCRIBED create=False suggest=False
+[2026-10-02 07:26:15] GROUP 18/100
+[2026-10-02 07:27:06] STATE https://vk.ru/club87281628 -> SCAN_ONLY
+[2026-10-02 07:27:06] SCAN https://vk.ru/club87281628 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:27:12] GROUP 19/100
+[2026-10-02 07:28:12] STATE https://vk.ru/poputnyi_gruz.krasnoyarsc -> SCAN_ONLY
+[2026-10-02 07:28:12] SCAN https://vk.ru/poputnyi_gruz.krasnoyarsc subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:28:19] GROUP 20/100
+[2026-10-02 07:29:09] STATE https://vk.ru/kizil_kray -> SCAN_ONLY
+[2026-10-02 07:29:09] SCAN https://vk.ru/kizil_kray subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:29:14] GROUP 21/100
+[2026-10-02 07:30:24] STATE https://vk.ru/poputkatuva17 -> SCAN_ONLY
+[2026-10-02 07:30:24] SCAN https://vk.ru/poputkatuva17 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:30:29] GROUP 22/100
+[2026-10-02 07:31:22] STATE https://vk.ru/club35244909 -> SCAN_ONLY
+[2026-10-02 07:31:22] SCAN https://vk.ru/club35244909 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:31:27] GROUP 23/100
+[2026-10-02 07:32:25] STATE https://vk.ru/poputkasibir -> SCAN_ONLY
+[2026-10-02 07:32:25] SCAN https://vk.ru/poputkasibir subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:32:31] GROUP 24/100
+[2026-10-02 07:33:29] STATE https://vk.ru/abakan_achinsk_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 07:33:29] SCAN https://vk.ru/abakan_achinsk_krasnoyarsk subscription=SUBSCRIBED create=False suggest=False
+[2026-10-02 07:33:33] GROUP 25/100
+[2026-10-02 07:34:10] STATE https://vk.ru/club82363327 -> SCAN_ONLY
+[2026-10-02 07:34:10] SCAN https://vk.ru/club82363327 subscription=SUBSCRIBED create=False suggest=False
+[2026-10-02 07:34:16] GROUP 26/100
+[2026-10-02 07:35:13] STATE https://vk.ru/abakania -> SCAN_ONLY
+[2026-10-02 07:35:13] SCAN https://vk.ru/abakania subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:35:17] GROUP 27/100
+[2026-10-02 07:36:19] STATE https://vk.ru/tiva17 -> SCAN_ONLY
+[2026-10-02 07:36:19] SCAN https://vk.ru/tiva17 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:36:26] GROUP 28/100
+[2026-10-02 07:37:20] STATE https://vk.ru/shush24 -> SCAN_ONLY
+[2026-10-02 07:37:20] SCAN https://vk.ru/shush24 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:37:25] GROUP 29/100
+[2026-10-02 07:38:15] STATE https://vk.ru/krasnoyarsk__kyzyl -> SCAN_ONLY
+[2026-10-02 07:38:15] SCAN https://vk.ru/krasnoyarsk__kyzyl subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:38:23] GROUP 30/100
+[2026-10-02 07:39:24] STATE https://vk.ru/saiani019 -> SCAN_ONLY
+[2026-10-02 07:39:24] SCAN https://vk.ru/saiani019 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:39:28] GROUP 31/100
+[2026-10-02 07:40:25] STATE https://vk.ru/gruz_poputi -> SCAN_ONLY
+[2026-10-02 07:40:25] SCAN https://vk.ru/gruz_poputi subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:40:32] GROUP 32/100
+[2026-10-02 07:41:28] STATE https://vk.ru/poputkatuva1 -> SCAN_ONLY
+[2026-10-02 07:41:28] SCAN https://vk.ru/poputkatuva1 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:41:33] GROUP 33/100
+[2026-10-02 07:42:30] STATE https://vk.ru/kyzyl17_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 07:42:30] SCAN https://vk.ru/kyzyl17_krasnoyarsk subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:42:37] GROUP 34/100
+[2026-10-02 07:43:26] STATE https://vk.ru/krasnoyarsk_kyzyl -> SCAN_ONLY
+[2026-10-02 07:43:26] SCAN https://vk.ru/krasnoyarsk_kyzyl subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:43:32] GROUP 35/100
+[2026-10-02 07:44:44] STATE https://vk.ru/ermakovskae -> SCAN_ONLY
+[2026-10-02 07:44:44] SCAN https://vk.ru/ermakovskae subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 07:44:49] GROUP 36/100
+[2026-10-02 07:46:00] STATE https://vk.ru/elita_kizil -> SCAN_ONLY
+[2026-10-02 07:46:00] SCAN https://vk.ru/elita_kizil subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 07:46:07] GROUP 37/100
+[2026-10-02 07:47:41] STATE https://vk.ru/club62465528 -> SCAN_ONLY
+[2026-10-02 07:47:41] SCAN https://vk.ru/club62465528 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 07:47:47] GROUP 38/100
+[2026-10-02 07:48:15] STATE https://vk.ru/poputkakyzyl -> SCAN_ONLY
+[2026-10-02 07:48:15] SCAN https://vk.ru/poputkakyzyl subscription=UNKNOWN create=False suggest=False
+[2026-10-02 07:48:20] GROUP 39/100
+[2026-10-02 07:49:28] STATE https://vk.ru/club147481905 -> SCAN_ONLY
+[2026-10-02 07:49:28] SCAN https://vk.ru/club147481905 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 07:49:35] GROUP 40/100
+[2026-10-02 07:50:26] STATE https://vk.ru/club63327436 -> SCAN_ONLY
+[2026-10-02 07:50:26] SCAN https://vk.ru/club63327436 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:50:32] GROUP 41/100
+[2026-10-02 07:51:03] STATE https://vk.ru/balahtapop -> SCAN_ONLY
+[2026-10-02 07:51:03] SCAN https://vk.ru/balahtapop subscription=SUBSCRIBED create=False suggest=True
+[2026-10-02 07:51:09] GROUP 42/100
+[2026-10-02 07:52:01] STATE https://vk.ru/askizpoputka -> SCAN_ONLY
+[2026-10-02 07:52:01] SCAN https://vk.ru/askizpoputka subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 07:52:07] GROUP 43/100
+[2026-10-02 07:52:46] STATE https://vk.ru/popytka24k -> SCAN_ONLY
+[2026-10-02 07:52:46] SCAN https://vk.ru/popytka24k subscription=SUBSCRIBED create=False suggest=True
+[2026-10-02 07:52:54] GROUP 44/100
+[2026-10-02 07:54:06] STATE https://vk.ru/tuvapoputka17 -> SCAN_ONLY
+[2026-10-02 07:54:06] SCAN https://vk.ru/tuvapoputka17 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 07:54:11] GROUP 45/100
+[2026-10-02 07:55:16] STATE https://vk.ru/poputkatuvaaa -> SCAN_ONLY
+[2026-10-02 07:55:16] SCAN https://vk.ru/poputkatuvaaa subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 07:55:22] GROUP 46/100
+[2026-10-02 07:56:29] STATE https://vk.ru/poputchiki_sibir -> SCAN_ONLY
+[2026-10-02 07:56:29] SCAN https://vk.ru/poputchiki_sibir subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 07:56:35] GROUP 47/100
+[2026-10-02 07:57:47] STATE https://vk.ru/popytkakyzylkrasnoyrsk -> SCAN_ONLY
+[2026-10-02 07:57:47] SCAN https://vk.ru/popytkakyzylkrasnoyrsk subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 07:57:53] GROUP 48/100
+[2026-10-02 07:59:02] STATE https://vk.ru/myblablacar -> SCAN_ONLY
+[2026-10-02 07:59:02] SCAN https://vk.ru/myblablacar subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 07:59:08] GROUP 49/100
+[2026-10-02 08:00:22] STATE https://vk.ru/popytka1rossia -> SCAN_ONLY
+[2026-10-02 08:00:22] SCAN https://vk.ru/popytka1rossia subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 08:00:29] GROUP 50/100
+[2026-10-02 08:01:19] STATE https://vk.ru/club196674442 -> SCAN_ONLY
+[2026-10-02 08:01:19] SCAN https://vk.ru/club196674442 subscription=UNKNOWN create=False suggest=False
+[2026-10-02 08:01:23] GROUP 51/100
+[2026-10-02 08:02:33] STATE https://vk.ru/poputiabakankyzyl -> SCAN_ONLY
+[2026-10-02 08:02:33] SCAN https://vk.ru/poputiabakankyzyl subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 08:02:40] GROUP 52/100
+[2026-10-02 08:03:52] STATE https://vk.ru/taxi_abakan_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 08:03:52] SCAN https://vk.ru/taxi_abakan_krasnoyarsk subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 08:03:57] GROUP 53/100
+[2026-10-02 08:05:28] STATE https://vk.ru/club141669199 -> SCAN_ONLY
+[2026-10-02 08:05:28] SCAN https://vk.ru/club141669199 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 08:05:33] GROUP 54/100
+[2026-10-02 08:06:41] STATE https://vk.ru/poputkoy -> SCAN_ONLY
+[2026-10-02 08:06:41] SCAN https://vk.ru/poputkoy subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 08:06:48] GROUP 55/100
+[2026-10-02 08:07:51] STATE https://vk.ru/club127032348 -> SCAN_ONLY
+[2026-10-02 08:07:51] SCAN https://vk.ru/club127032348 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 08:07:55] GROUP 56/100
+[2026-10-02 09:47:18] ========================================================================
+[2026-10-02 09:47:18] VK WORKER UNIFIED START MODE=SCAN
+[2026-10-02 09:47:18] GROUPS=100
+[2026-10-02 09:47:18] FLAGS production=False test_submit=False subscribe=False
+[2026-10-02 09:47:20] GROUP 1/100
+[2026-10-02 09:48:12] STATE https://vk.ru/poputchiki19 -> SCAN_ONLY
+[2026-10-02 09:48:12] SCAN https://vk.ru/poputchiki19 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 09:48:16] GROUP 2/100
+[2026-10-02 09:49:04] STATE https://vk.ru/19kray24 -> SCAN_ONLY
+[2026-10-02 09:49:04] SCAN https://vk.ru/19kray24 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 09:49:09] GROUP 3/100
+[2026-10-02 09:50:00] STATE https://vk.ru/24kray24 -> SCAN_ONLY
+[2026-10-02 09:50:00] SCAN https://vk.ru/24kray24 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 09:50:06] GROUP 4/100
+[2026-10-02 09:51:21] STATE https://vk.ru/club149430851 -> SCAN_ONLY
+[2026-10-02 09:51:21] SCAN https://vk.ru/club149430851 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 09:51:25] GROUP 5/100
+[2026-10-02 09:52:18] STATE https://vk.ru/poputkakrasnoyarsk -> SCAN_ONLY
+[2026-10-02 09:52:18] SCAN https://vk.ru/poputkakrasnoyarsk subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 09:52:25] GROUP 6/100
+[2026-10-02 09:53:17] STATE https://vk.ru/vputi_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 09:53:17] SCAN https://vk.ru/vputi_krasnoyarsk subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 09:53:24] GROUP 7/100
+[2026-10-02 09:54:08] STATE https://vk.ru/super_laike17 -> SCAN_ONLY
+[2026-10-02 09:54:08] SCAN https://vk.ru/super_laike17 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 09:54:14] GROUP 8/100
+[2026-10-02 09:54:59] STATE https://vk.ru/poputka_abakan_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 09:54:59] SCAN https://vk.ru/poputka_abakan_krasnoyarsk subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 09:55:07] GROUP 9/100
+[2026-10-02 09:56:00] STATE https://vk.ru/poputchiki_kyzyl_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 09:56:00] SCAN https://vk.ru/poputchiki_kyzyl_krasnoyarsk subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 09:56:05] GROUP 10/100
+[2026-10-02 09:56:50] STATE https://vk.ru/poputikansk -> SCAN_ONLY
+[2026-10-02 09:56:50] SCAN https://vk.ru/poputikansk subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 09:56:56] GROUP 11/100
+[2026-10-02 09:57:50] STATE https://vk.ru/poputka_hakasia -> SCAN_ONLY
+[2026-10-02 09:57:50] SCAN https://vk.ru/poputka_hakasia subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 09:57:55] GROUP 12/100
+[2026-10-02 09:58:56] STATE https://vk.ru/turistdoska11 -> SCAN_ONLY
+[2026-10-02 09:58:56] SCAN https://vk.ru/turistdoska11 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 09:59:02] GROUP 13/100
+[2026-10-02 09:59:44] STATE https://vk.ru/passagiry_kyzyl_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 09:59:44] SCAN https://vk.ru/passagiry_kyzyl_krasnoyarsk subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 09:59:51] GROUP 14/100
+[2026-10-02 10:00:41] STATE https://vk.ru/19abaza -> SCAN_ONLY
+[2026-10-02 10:00:41] SCAN https://vk.ru/19abaza subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:00:46] GROUP 15/100
+[2026-10-02 10:01:41] STATE https://vk.ru/poputchik_krasnoyarsk_abakan -> SCAN_ONLY
+[2026-10-02 10:01:41] SCAN https://vk.ru/poputchik_krasnoyarsk_abakan subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:01:47] GROUP 16/100
+[2026-10-02 10:03:08] STATE https://vk.ru/poputkakzlabakan -> SCAN_ONLY
+[2026-10-02 10:03:08] SCAN https://vk.ru/poputkakzlabakan subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:03:13] GROUP 17/100
+[2026-10-02 10:03:52] STATE https://vk.ru/moiapoputka24 -> SCAN_ONLY
+[2026-10-02 10:03:52] SCAN https://vk.ru/moiapoputka24 subscription=SUBSCRIBED create=False suggest=False
+[2026-10-02 10:03:58] GROUP 18/100
+[2026-10-02 10:04:44] STATE https://vk.ru/club87281628 -> SCAN_ONLY
+[2026-10-02 10:04:44] SCAN https://vk.ru/club87281628 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:04:50] GROUP 19/100
+[2026-10-02 10:05:38] STATE https://vk.ru/poputnyi_gruz.krasnoyarsc -> SCAN_ONLY
+[2026-10-02 10:05:38] SCAN https://vk.ru/poputnyi_gruz.krasnoyarsc subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:05:43] GROUP 20/100
+[2026-10-02 10:06:26] STATE https://vk.ru/kizil_kray -> SCAN_ONLY
+[2026-10-02 10:06:26] SCAN https://vk.ru/kizil_kray subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:06:34] GROUP 21/100
+[2026-10-02 10:07:30] STATE https://vk.ru/poputkatuva17 -> SCAN_ONLY
+[2026-10-02 10:07:30] SCAN https://vk.ru/poputkatuva17 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:07:37] GROUP 22/100
+[2026-10-02 10:08:23] STATE https://vk.ru/club35244909 -> SCAN_ONLY
+[2026-10-02 10:08:23] SCAN https://vk.ru/club35244909 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:08:27] GROUP 23/100
+[2026-10-02 10:09:14] STATE https://vk.ru/poputkasibir -> SCAN_ONLY
+[2026-10-02 10:09:14] SCAN https://vk.ru/poputkasibir subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:09:20] GROUP 24/100
+[2026-10-02 10:10:15] STATE https://vk.ru/abakan_achinsk_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 10:10:15] SCAN https://vk.ru/abakan_achinsk_krasnoyarsk subscription=SUBSCRIBED create=False suggest=False
+[2026-10-02 10:10:19] GROUP 25/100
+[2026-10-02 10:10:55] STATE https://vk.ru/club82363327 -> SCAN_ONLY
+[2026-10-02 10:10:55] SCAN https://vk.ru/club82363327 subscription=SUBSCRIBED create=False suggest=False
+[2026-10-02 10:11:01] GROUP 26/100
+[2026-10-02 10:12:10] STATE https://vk.ru/abakania -> SCAN_ONLY
+[2026-10-02 10:12:10] SCAN https://vk.ru/abakania subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:12:16] GROUP 27/100
+[2026-10-02 10:13:08] STATE https://vk.ru/tiva17 -> SCAN_ONLY
+[2026-10-02 10:13:08] SCAN https://vk.ru/tiva17 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:13:13] GROUP 28/100
+[2026-10-02 10:13:58] STATE https://vk.ru/shush24 -> SCAN_ONLY
+[2026-10-02 10:13:58] SCAN https://vk.ru/shush24 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:14:03] GROUP 29/100
+[2026-10-02 10:14:48] STATE https://vk.ru/krasnoyarsk__kyzyl -> SCAN_ONLY
+[2026-10-02 10:14:48] SCAN https://vk.ru/krasnoyarsk__kyzyl subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:14:56] GROUP 30/100
+[2026-10-02 10:15:51] STATE https://vk.ru/saiani019 -> SCAN_ONLY
+[2026-10-02 10:15:51] SCAN https://vk.ru/saiani019 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:15:57] GROUP 31/100
+[2026-10-02 10:16:50] STATE https://vk.ru/gruz_poputi -> SCAN_ONLY
+[2026-10-02 10:16:50] SCAN https://vk.ru/gruz_poputi subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:16:57] GROUP 32/100
+[2026-10-02 10:17:47] STATE https://vk.ru/poputkatuva1 -> SCAN_ONLY
+[2026-10-02 10:17:47] SCAN https://vk.ru/poputkatuva1 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:17:51] GROUP 33/100
+[2026-10-02 10:18:39] STATE https://vk.ru/kyzyl17_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 10:18:39] SCAN https://vk.ru/kyzyl17_krasnoyarsk subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:18:47] GROUP 34/100
+[2026-10-02 10:19:32] STATE https://vk.ru/krasnoyarsk_kyzyl -> SCAN_ONLY
+[2026-10-02 10:19:32] SCAN https://vk.ru/krasnoyarsk_kyzyl subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:19:39] GROUP 35/100
+[2026-10-02 10:20:49] STATE https://vk.ru/ermakovskae -> SCAN_ONLY
+[2026-10-02 10:20:49] SCAN https://vk.ru/ermakovskae subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:20:53] GROUP 36/100
+[2026-10-02 10:21:55] STATE https://vk.ru/elita_kizil -> SCAN_ONLY
+[2026-10-02 10:21:55] SCAN https://vk.ru/elita_kizil subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:22:02] GROUP 37/100
+[2026-10-02 10:23:26] STATE https://vk.ru/club62465528 -> SCAN_ONLY
+[2026-10-02 10:23:26] SCAN https://vk.ru/club62465528 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:23:31] GROUP 38/100
+[2026-10-02 10:24:00] STATE https://vk.ru/poputkakyzyl -> SCAN_ONLY
+[2026-10-02 10:24:00] SCAN https://vk.ru/poputkakyzyl subscription=UNKNOWN create=False suggest=False
+[2026-10-02 10:24:04] GROUP 39/100
+[2026-10-02 10:25:05] STATE https://vk.ru/club147481905 -> SCAN_ONLY
+[2026-10-02 10:25:05] SCAN https://vk.ru/club147481905 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:25:11] GROUP 40/100
+[2026-10-02 10:26:00] STATE https://vk.ru/club63327436 -> SCAN_ONLY
+[2026-10-02 10:26:00] SCAN https://vk.ru/club63327436 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:26:05] GROUP 41/100
+[2026-10-02 10:26:34] STATE https://vk.ru/balahtapop -> SCAN_ONLY
+[2026-10-02 10:26:34] SCAN https://vk.ru/balahtapop subscription=SUBSCRIBED create=False suggest=True
+[2026-10-02 10:26:41] GROUP 42/100
+[2026-10-02 10:27:37] STATE https://vk.ru/askizpoputka -> SCAN_ONLY
+[2026-10-02 10:27:37] SCAN https://vk.ru/askizpoputka subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 10:27:42] GROUP 43/100
+[2026-10-02 10:28:07] STATE https://vk.ru/popytka24k -> SCAN_ONLY
+[2026-10-02 10:28:07] SCAN https://vk.ru/popytka24k subscription=SUBSCRIBED create=False suggest=True
+[2026-10-02 10:28:11] GROUP 44/100
+[2026-10-02 10:29:19] STATE https://vk.ru/tuvapoputka17 -> SCAN_ONLY
+[2026-10-02 10:29:19] SCAN https://vk.ru/tuvapoputka17 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:29:26] GROUP 45/100
+[2026-10-02 10:30:29] STATE https://vk.ru/poputkatuvaaa -> SCAN_ONLY
+[2026-10-02 10:30:29] SCAN https://vk.ru/poputkatuvaaa subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:30:33] GROUP 46/100
+[2026-10-02 10:31:36] STATE https://vk.ru/poputchiki_sibir -> SCAN_ONLY
+[2026-10-02 10:31:36] SCAN https://vk.ru/poputchiki_sibir subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:31:42] GROUP 47/100
+[2026-10-02 10:32:53] STATE https://vk.ru/popytkakyzylkrasnoyrsk -> SCAN_ONLY
+[2026-10-02 10:32:53] SCAN https://vk.ru/popytkakyzylkrasnoyrsk subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:32:57] GROUP 48/100
+[2026-10-02 10:33:56] STATE https://vk.ru/myblablacar -> SCAN_ONLY
+[2026-10-02 10:33:56] SCAN https://vk.ru/myblablacar subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:34:01] GROUP 49/100
+[2026-10-02 10:35:11] STATE https://vk.ru/popytka1rossia -> SCAN_ONLY
+[2026-10-02 10:35:11] SCAN https://vk.ru/popytka1rossia subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:35:17] GROUP 50/100
+[2026-10-02 10:36:05] STATE https://vk.ru/club196674442 -> SCAN_ONLY
+[2026-10-02 10:36:05] SCAN https://vk.ru/club196674442 subscription=UNKNOWN create=False suggest=False
+[2026-10-02 10:36:10] GROUP 51/100
+[2026-10-02 10:37:13] STATE https://vk.ru/poputiabakankyzyl -> SCAN_ONLY
+[2026-10-02 10:37:13] SCAN https://vk.ru/poputiabakankyzyl subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:37:21] GROUP 52/100
+[2026-10-02 10:38:26] STATE https://vk.ru/taxi_abakan_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 10:38:26] SCAN https://vk.ru/taxi_abakan_krasnoyarsk subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:38:31] GROUP 53/100
+[2026-10-02 10:39:53] STATE https://vk.ru/club141669199 -> SCAN_ONLY
+[2026-10-02 10:39:53] SCAN https://vk.ru/club141669199 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:40:00] GROUP 54/100
+[2026-10-02 10:41:01] STATE https://vk.ru/poputkoy -> SCAN_ONLY
+[2026-10-02 10:41:01] SCAN https://vk.ru/poputkoy subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:41:06] GROUP 55/100
+[2026-10-02 10:42:01] STATE https://vk.ru/club127032348 -> SCAN_ONLY
+[2026-10-02 10:42:01] SCAN https://vk.ru/club127032348 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:42:07] GROUP 56/100
+[2026-10-02 10:43:09] STATE https://vk.ru/poputchik_iz_kzl -> SCAN_ONLY
+[2026-10-02 10:43:09] SCAN https://vk.ru/poputchik_iz_kzl subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:43:17] GROUP 57/100
+[2026-10-02 10:44:23] STATE https://vk.ru/carriageofpassengers -> SCAN_ONLY
+[2026-10-02 10:44:23] SCAN https://vk.ru/carriageofpassengers subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:44:27] GROUP 58/100
+[2026-10-02 10:45:31] STATE https://vk.ru/poputchikisnami -> SCAN_ONLY
+[2026-10-02 10:45:31] SCAN https://vk.ru/poputchikisnami subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:45:36] GROUP 59/100
+[2026-10-02 10:46:30] STATE https://vk.ru/club75119076 -> SCAN_ONLY
+[2026-10-02 10:46:30] SCAN https://vk.ru/club75119076 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:46:37] GROUP 60/100
+[2026-10-02 10:47:39] STATE https://vk.ru/poputchiki_kja -> SCAN_ONLY
+[2026-10-02 10:47:39] SCAN https://vk.ru/poputchiki_kja subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:47:43] GROUP 61/100
+[2026-10-02 10:48:44] STATE https://vk.ru/club73054968 -> SCAN_ONLY
+[2026-10-02 10:48:44] SCAN https://vk.ru/club73054968 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:48:49] GROUP 62/100
+[2026-10-02 10:49:39] STATE https://vk.ru/club94486052 -> SCAN_ONLY
+[2026-10-02 10:49:39] SCAN https://vk.ru/club94486052 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:49:46] GROUP 63/100
+[2026-10-02 10:50:51] STATE https://vk.ru/club180685626 -> SCAN_ONLY
+[2026-10-02 10:50:51] SCAN https://vk.ru/club180685626 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:50:57] GROUP 64/100
+[2026-10-02 10:51:57] STATE https://vk.ru/club102886517 -> SCAN_ONLY
+[2026-10-02 10:51:57] SCAN https://vk.ru/club102886517 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:52:03] GROUP 65/100
+[2026-10-02 10:53:03] STATE https://vk.ru/club38210023 -> SCAN_ONLY
+[2026-10-02 10:53:03] SCAN https://vk.ru/club38210023 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:53:10] GROUP 66/100
+[2026-10-02 10:54:05] STATE https://vk.ru/poputki24 -> SCAN_ONLY
+[2026-10-02 10:54:05] SCAN https://vk.ru/poputki24 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:54:12] GROUP 67/100
+[2026-10-02 10:55:08] STATE https://vk.ru/siberian_road -> SCAN_ONLY
+[2026-10-02 10:55:08] SCAN https://vk.ru/siberian_road subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:55:13] GROUP 68/100
+[2026-10-02 10:56:22] STATE https://vk.ru/krasnoyarsk_fellow_travelers -> SCAN_ONLY
+[2026-10-02 10:56:22] SCAN https://vk.ru/krasnoyarsk_fellow_travelers subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:56:28] GROUP 69/100
+[2026-10-02 10:57:30] STATE https://vk.ru/poputchiki19_rus -> SCAN_ONLY
+[2026-10-02 10:57:30] SCAN https://vk.ru/poputchiki19_rus subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:57:35] GROUP 70/100
+[2026-10-02 10:58:33] STATE https://vk.ru/krasnoyarskyug -> SCAN_ONLY
+[2026-10-02 10:58:33] SCAN https://vk.ru/krasnoyarskyug subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:58:37] GROUP 71/100
+[2026-10-02 10:59:34] STATE https://vk.ru/abakan.krasnoyarsk -> SCAN_ONLY
+[2026-10-02 10:59:34] SCAN https://vk.ru/abakan.krasnoyarsk subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 10:59:39] GROUP 72/100
+[2026-10-02 11:00:45] STATE https://vk.ru/club68002131 -> SCAN_ONLY
+[2026-10-02 11:00:45] SCAN https://vk.ru/club68002131 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:00:50] GROUP 73/100
+[2026-10-02 11:01:52] STATE https://vk.ru/doroga124 -> SCAN_ONLY
+[2026-10-02 11:01:52] SCAN https://vk.ru/doroga124 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:02:00] GROUP 74/100
+[2026-10-02 11:02:53] STATE https://vk.ru/club165501960 -> SCAN_ONLY
+[2026-10-02 11:02:53] SCAN https://vk.ru/club165501960 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:03:01] GROUP 75/100
+[2026-10-02 11:03:58] STATE https://vk.ru/club176621849 -> SCAN_ONLY
+[2026-10-02 11:03:58] SCAN https://vk.ru/club176621849 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:04:03] GROUP 76/100
+[2026-10-02 11:05:01] STATE https://vk.ru/kraspk24 -> SCAN_ONLY
+[2026-10-02 11:05:01] SCAN https://vk.ru/kraspk24 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:05:07] GROUP 77/100
+[2026-10-02 11:05:59] STATE https://vk.ru/club152901365 -> SCAN_ONLY
+[2026-10-02 11:05:59] SCAN https://vk.ru/club152901365 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:06:04] GROUP 78/100
+[2026-10-02 11:07:02] STATE https://vk.ru/minusgo -> SCAN_ONLY
+[2026-10-02 11:07:02] SCAN https://vk.ru/minusgo subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:07:06] GROUP 79/100
+[2026-10-02 11:08:03] STATE https://vk.ru/krasnoyarsk24abakan19 -> SCAN_ONLY
+[2026-10-02 11:08:03] SCAN https://vk.ru/krasnoyarsk24abakan19 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:08:10] GROUP 80/100
+[2026-10-02 11:09:06] STATE https://vk.ru/poputch_krsk -> SCAN_ONLY
+[2026-10-02 11:09:06] SCAN https://vk.ru/poputch_krsk subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:09:13] GROUP 81/100
+[2026-10-02 11:10:11] STATE https://vk.ru/club130981792 -> SCAN_ONLY
+[2026-10-02 11:10:11] SCAN https://vk.ru/club130981792 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:10:16] GROUP 82/100
+[2026-10-02 11:11:17] STATE https://vk.ru/putydoroga -> SCAN_ONLY
+[2026-10-02 11:11:17] SCAN https://vk.ru/putydoroga subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:11:24] GROUP 83/100
+[2026-10-02 11:12:28] STATE https://vk.ru/elsib -> SCAN_ONLY
+[2026-10-02 11:12:28] SCAN https://vk.ru/elsib subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:12:35] GROUP 84/100
+[2026-10-02 11:13:27] STATE https://vk.ru/club135934765 -> SCAN_ONLY
+[2026-10-02 11:13:27] SCAN https://vk.ru/club135934765 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:13:33] GROUP 85/100
+[2026-10-02 11:14:32] STATE https://vk.ru/po_putynam -> SCAN_ONLY
+[2026-10-02 11:14:32] SCAN https://vk.ru/po_putynam subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:14:38] GROUP 86/100
+[2026-10-02 11:15:48] STATE https://vk.ru/popabakan17 -> SCAN_ONLY
+[2026-10-02 11:15:48] SCAN https://vk.ru/popabakan17 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:15:55] GROUP 87/100
+[2026-10-02 11:16:42] STATE https://vk.ru/poputka124 -> SCAN_ONLY
+[2026-10-02 11:16:42] SCAN https://vk.ru/poputka124 subscription=NOT_SUBSCRIBED create=False suggest=True
+[2026-10-02 11:16:50] GROUP 88/100
+[2026-10-02 11:17:48] STATE https://vk.ru/club36698366 -> SCAN_ONLY
+[2026-10-02 11:17:48] SCAN https://vk.ru/club36698366 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:17:52] GROUP 89/100
+[2026-10-02 11:18:50] STATE https://vk.ru/popytchiki24 -> SCAN_ONLY
+[2026-10-02 11:18:50] SCAN https://vk.ru/popytchiki24 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:18:56] GROUP 90/100
+[2026-10-02 11:20:00] STATE https://vk.ru/club20831058 -> SCAN_ONLY
+[2026-10-02 11:20:00] SCAN https://vk.ru/club20831058 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:20:06] GROUP 91/100
+[2026-10-02 11:21:09] STATE https://vk.ru/poputka_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 11:21:09] SCAN https://vk.ru/poputka_krasnoyarsk subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:21:13] GROUP 92/100
+[2026-10-02 11:22:16] STATE https://vk.ru/poputchik_abk_krs -> SCAN_ONLY
+[2026-10-02 11:22:16] SCAN https://vk.ru/poputchik_abk_krs subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:22:24] GROUP 93/100
+[2026-10-02 11:23:22] STATE https://vk.ru/club126019148 -> SCAN_ONLY
+[2026-10-02 11:23:22] SCAN https://vk.ru/club126019148 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:23:27] GROUP 94/100
+[2026-10-02 11:24:27] STATE https://vk.ru/yedyyvezy -> SCAN_ONLY
+[2026-10-02 11:24:27] SCAN https://vk.ru/yedyyvezy subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:24:33] GROUP 95/100
+[2026-10-02 11:25:30] STATE https://vk.ru/podvezu_minusinsk -> SCAN_ONLY
+[2026-10-02 11:25:30] SCAN https://vk.ru/podvezu_minusinsk subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:25:38] GROUP 96/100
+[2026-10-02 11:26:36] STATE https://vk.ru/poputchik_krasnojarsk_abakan -> SCAN_ONLY
+[2026-10-02 11:26:36] SCAN https://vk.ru/poputchik_krasnojarsk_abakan subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:26:41] GROUP 97/100
+[2026-10-02 11:27:35] STATE https://vk.ru/poputkaminusinskkrasnoyarsk -> SCAN_ONLY
+[2026-10-02 11:27:35] SCAN https://vk.ru/poputkaminusinskkrasnoyarsk subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:27:41] GROUP 98/100
+[2026-10-02 11:28:43] STATE https://vk.ru/abakan_krasnoyarsk -> SCAN_ONLY
+[2026-10-02 11:28:43] SCAN https://vk.ru/abakan_krasnoyarsk subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:28:47] GROUP 99/100
+[2026-10-02 11:29:52] STATE https://vk.ru/tyr17 -> SCAN_ONLY
+[2026-10-02 11:29:52] SCAN https://vk.ru/tyr17 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:29:58] GROUP 100/100
+[2026-10-02 11:30:56] STATE https://vk.ru/poputchik1719 -> SCAN_ONLY
+[2026-10-02 11:30:56] SCAN https://vk.ru/poputchik1719 subscription=NOT_SUBSCRIBED create=False suggest=False
+[2026-10-02 11:52:31] ========================================================================
+[2026-10-02 11:52:31] VK WORKER UNIFIED START MODE=SCAN
+[2026-10-02 11:52:31] GROUPS=100
+[2026-10-02 11:52:31] FLAGS production=False test_submit=False subscribe=False
+[2026-10-02 11:52:33] GROUP 1/100
+[2026-10-02 11:53:22] STATE https://vk.ru/poputchiki19 -> SCAN_ONLY
+[2026-10-02 11:53:22] SCAN https://vk.ru/poputchiki19 subscription=SUBSCRIBED create=True suggest=False
+[2026-10-02 11:53:28] GROUP 2/100

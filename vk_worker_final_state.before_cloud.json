@@ -1,0 +1,869 @@
+{
+  "bridge_version": "3.1",
+  "controller_enabled": true,
+  "source": "windows",
+  "updated_at": "2026-10-02T11:41:49",
+  "production_enabled": false,
+  "telegram_publish_enabled": false,
+  "telegram_subscribe_enabled": false,
+  "telegram_join_enabled": false,
+  "create_submit_enabled": false,
+  "telegram_scan_start_enabled": true,
+  "telegram_scan_stop_enabled": true,
+  "worker_running": false,
+  "worker_pid": null,
+  "worker_file": "vk_worker_final_locked.py",
+  "groups_total": 121,
+  "groups_in_state": 101,
+  "groups_recognized": true,
+  "groups_source_path": "root.groups",
+  "groups": [
+    {
+      "url": "https://vk.ru/poputchiki19",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:28:54"
+    },
+    {
+      "url": "https://vk.ru/19kray24",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:29:44"
+    },
+    {
+      "url": "https://vk.ru/24kray24",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:30:36"
+    },
+    {
+      "url": "https://vk.ru/club149430851",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:31:57"
+    },
+    {
+      "url": "https://vk.ru/poputkakrasnoyarsk",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:32:56"
+    },
+    {
+      "url": "https://vk.ru/vputi_krasnoyarsk",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:33:40"
+    },
+    {
+      "url": "https://vk.ru/super_laike17",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:34:28"
+    },
+    {
+      "url": "https://vk.ru/poputka_abakan_krasnoyarsk",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:35:12"
+    },
+    {
+      "url": "https://vk.ru/poputchiki_kyzyl_krasnoyarsk",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:36:02"
+    },
+    {
+      "url": "https://vk.ru/poputikansk",
+      "status": "SCAN_ONLY",
+      "subscription": "UNKNOWN",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:36:57"
+    },
+    {
+      "url": "https://vk.ru/poputka_hakasia",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:37:42"
+    },
+    {
+      "url": "https://vk.ru/turistdoska11",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:38:33"
+    },
+    {
+      "url": "https://vk.ru/passagiry_kyzyl_krasnoyarsk",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:39:20"
+    },
+    {
+      "url": "https://vk.ru/19abaza",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:40:10"
+    },
+    {
+      "url": "https://vk.ru/poputchik_krasnoyarsk_abakan",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:40:54"
+    },
+    {
+      "url": "https://vk.ru/poputkakzlabakan",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:42:26"
+    },
+    {
+      "url": "https://vk.ru/moiapoputka24",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:43:04"
+    },
+    {
+      "url": "https://vk.ru/club87281628",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:43:39"
+    },
+    {
+      "url": "https://vk.ru/poputnyi_gruz.krasnoyarsc",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:44:19"
+    },
+    {
+      "url": "https://vk.ru/kizil_kray",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:45:02"
+    },
+    {
+      "url": "https://vk.ru/poputkatuva17",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:45:44"
+    },
+    {
+      "url": "https://vk.ru/club35244909",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:46:21"
+    },
+    {
+      "url": "https://vk.ru/poputkasibir",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:47:01"
+    },
+    {
+      "url": "https://vk.ru/abakan_achinsk_krasnoyarsk",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:47:41"
+    },
+    {
+      "url": "https://vk.ru/club82363327",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:48:14"
+    },
+    {
+      "url": "https://vk.ru/abakania",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:48:53"
+    },
+    {
+      "url": "https://vk.ru/tiva17",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:49:32"
+    },
+    {
+      "url": "https://vk.ru/shush24",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:50:12"
+    },
+    {
+      "url": "https://vk.ru/krasnoyarsk__kyzyl",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:50:50"
+    },
+    {
+      "url": "https://vk.ru/saiani019",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:51:28"
+    },
+    {
+      "url": "https://vk.ru/gruz_poputi",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:52:12"
+    },
+    {
+      "url": "https://vk.ru/poputkatuva1",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:52:54"
+    },
+    {
+      "url": "https://vk.ru/kyzyl17_krasnoyarsk",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:53:36"
+    },
+    {
+      "url": "https://vk.ru/krasnoyarsk_kyzyl",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:54:12"
+    },
+    {
+      "url": "https://vk.ru/ermakovskae",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:55:10"
+    },
+    {
+      "url": "https://vk.ru/elita_kizil",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:56:06"
+    },
+    {
+      "url": "https://vk.ru/club62465528",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:57:27"
+    },
+    {
+      "url": "https://vk.ru/poputkakyzyl",
+      "status": "SCAN_ONLY",
+      "subscription": "UNKNOWN",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:58:09"
+    },
+    {
+      "url": "https://vk.ru/club147481905",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:59:02"
+    },
+    {
+      "url": "https://vk.ru/club63327436",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T19:59:40"
+    },
+    {
+      "url": "https://vk.ru/balahtapop",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": false,
+      "suggest": true,
+      "updated_at": "2026-10-01T19:59:56"
+    },
+    {
+      "url": "https://vk.ru/askizpoputka",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": true,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:00:36"
+    },
+    {
+      "url": "https://vk.ru/popytka24k",
+      "status": "SCAN_ONLY",
+      "subscription": "SUBSCRIBED",
+      "create": false,
+      "suggest": true,
+      "updated_at": "2026-10-01T20:00:52"
+    },
+    {
+      "url": "https://vk.ru/tuvapoputka17",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:01:53"
+    },
+    {
+      "url": "https://vk.ru/poputkatuvaaa",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:02:52"
+    },
+    {
+      "url": "https://vk.ru/poputchiki_sibir",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:03:54"
+    },
+    {
+      "url": "https://vk.ru/popytkakyzylkrasnoyrsk",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:04:54"
+    },
+    {
+      "url": "https://vk.ru/myblablacar",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:05:49"
+    },
+    {
+      "url": "https://vk.ru/popytka1rossia",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:06:45"
+    },
+    {
+      "url": "https://vk.ru/club196674442",
+      "status": "SCAN_ONLY",
+      "subscription": "UNKNOWN",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:07:31"
+    },
+    {
+      "url": "https://vk.ru/poputiabakankyzyl",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:08:38"
+    },
+    {
+      "url": "https://vk.ru/taxi_abakan_krasnoyarsk",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:09:33"
+    },
+    {
+      "url": "https://vk.ru/club141669199",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:10:57"
+    },
+    {
+      "url": "https://vk.ru/poputkoy",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:11:50"
+    },
+    {
+      "url": "https://vk.ru/club127032348",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:12:43"
+    },
+    {
+      "url": "https://vk.ru/poputchik_iz_kzl",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:13:43"
+    },
+    {
+      "url": "https://vk.ru/carriageofpassengers",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:14:40"
+    },
+    {
+      "url": "https://vk.ru/poputchikisnami",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:15:32"
+    },
+    {
+      "url": "https://vk.ru/club75119076",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:16:27"
+    },
+    {
+      "url": "https://vk.ru/poputchiki_kja",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:17:22"
+    },
+    {
+      "url": "https://vk.ru/club73054968",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:18:20"
+    },
+    {
+      "url": "https://vk.ru/club94486052",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:19:15"
+    },
+    {
+      "url": "https://vk.ru/club180685626",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:20:14"
+    },
+    {
+      "url": "https://vk.ru/club102886517",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:21:11"
+    },
+    {
+      "url": "https://vk.ru/club38210023",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:22:06"
+    },
+    {
+      "url": "https://vk.ru/poputki24",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:23:00"
+    },
+    {
+      "url": "https://vk.ru/siberian_road",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:23:55"
+    },
+    {
+      "url": "https://vk.ru/krasnoyarsk_fellow_travelers",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:24:54"
+    },
+    {
+      "url": "https://vk.ru/poputchiki19_rus",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:25:51"
+    },
+    {
+      "url": "https://vk.ru/krasnoyarskyug",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:26:52"
+    },
+    {
+      "url": "https://vk.ru/abakan.krasnoyarsk",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:27:50"
+    },
+    {
+      "url": "https://vk.ru/club68002131",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:28:51"
+    },
+    {
+      "url": "https://vk.ru/doroga124",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:29:44"
+    },
+    {
+      "url": "https://vk.ru/club165501960",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:30:34"
+    },
+    {
+      "url": "https://vk.ru/club176621849",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:31:30"
+    },
+    {
+      "url": "https://vk.ru/kraspk24",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:32:29"
+    },
+    {
+      "url": "https://vk.ru/club152901365",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:33:28"
+    },
+    {
+      "url": "https://vk.ru/minusgo",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:34:24"
+    },
+    {
+      "url": "https://vk.ru/krasnoyarsk24abakan19",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:35:19"
+    },
+    {
+      "url": "https://vk.ru/poputch_krsk",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:36:12"
+    },
+    {
+      "url": "https://vk.ru/club130981792",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:37:10"
+    },
+    {
+      "url": "https://vk.ru/putydoroga",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:38:09"
+    },
+    {
+      "url": "https://vk.ru/elsib",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:39:06"
+    },
+    {
+      "url": "https://vk.ru/club135934765",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:40:06"
+    },
+    {
+      "url": "https://vk.ru/po_putynam",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:41:01"
+    },
+    {
+      "url": "https://vk.ru/popabakan17",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:42:04"
+    },
+    {
+      "url": "https://vk.ru/poputka124",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": true,
+      "updated_at": "2026-10-01T20:42:40"
+    },
+    {
+      "url": "https://vk.ru/club36698366",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:43:36"
+    },
+    {
+      "url": "https://vk.ru/club240781173",
+      "status": "PROBABLE",
+      "subscription": "UNKNOWN",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T13:29:24"
+    },
+    {
+      "url": "https://vk.ru/popytchiki24",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:44:28"
+    },
+    {
+      "url": "https://vk.ru/club20831058",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:45:24"
+    },
+    {
+      "url": "https://vk.ru/poputka_krasnoyarsk",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:46:16"
+    },
+    {
+      "url": "https://vk.ru/poputchik_abk_krs",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:47:17"
+    },
+    {
+      "url": "https://vk.ru/club126019148",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:48:22"
+    },
+    {
+      "url": "https://vk.ru/yedyyvezy",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:49:28"
+    },
+    {
+      "url": "https://vk.ru/podvezu_minusinsk",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:50:29"
+    },
+    {
+      "url": "https://vk.ru/poputchik_krasnojarsk_abakan",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:51:27"
+    },
+    {
+      "url": "https://vk.ru/poputkaminusinskkrasnoyarsk",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:52:26"
+    },
+    {
+      "url": "https://vk.ru/abakan_krasnoyarsk",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:53:22"
+    },
+    {
+      "url": "https://vk.ru/tyr17",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:54:14"
+    },
+    {
+      "url": "https://vk.ru/poputchik1719",
+      "status": "SCAN_ONLY",
+      "subscription": "NOT_SUBSCRIBED",
+      "create": false,
+      "suggest": false,
+      "updated_at": "2026-10-01T20:55:08"
+    }
+  ],
+  "create_count": 30,
+  "suggest_count": 3,
+  "subscribed_count": 35,
+  "not_subscribed_count": 62,
+  "unknown_subscription_count": 4,
+  "scan_only_count": 100,
+  "error_count": 3,
+  "errors_preview": [
+    {
+      "url": "https://vk.ru/super_laike17",
+      "error": "Exception('Page.evaluate: Connection closed while reading from the driver')"
+    },
+    {
+      "url": "https://vk.ru/popabakan17",
+      "error": "RuntimeError('CREATE_ENTRY_NOT_FOUND')"
+    },
+    {
+      "url": "https://vk.ru/poputka124",
+      "error": "RuntimeError('EDITOR_NOT_UNIQUE:2')"
+    }
+  ],
+  "last_scan_finished_at": "2026-10-01T20:55:15",
+  "last_scan_status": "COMPLETED",
+  "last_scan_subscriptions": 0,
+  "last_scan_join_requests": 0,
+  "post_attempts": 0,
+  "last_command": null,
+  "last_command_at": null,
+  "last_command_result": null,
+  "vk_actions_by_bridge": 0,
+  "runs": [
+    {
+      "mode": "SCAN",
+      "finished_at": "2026-10-02T06:13:33",
+      "posts": 0,
+      "subscriptions": 0,
+      "join_requests": 0
+    }
+  ]
+}

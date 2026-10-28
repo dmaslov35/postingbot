@@ -1,0 +1,97 @@
+[2026-10-16 07:48:41] ========================================================================
+[2026-10-16 07:48:41] VK WORKER UNIFIED START MODE=TEST
+[2026-10-16 07:48:41] GROUPS=1
+[2026-10-16 07:48:41] FLAGS production=False test_submit=False subscribe=False
+[2026-10-16 07:48:44] GROUP 1/1
+[2026-10-16 07:48:44] ========================================================================
+[2026-10-16 07:48:44] OPEN https://vk.ru/club240781173
+[2026-10-16 07:49:00] FINAL URL https://vk.ru/challenge.html?tid=heHBE9lXTSs8dO6FY7sYLnP9qIWuDw&hash429=JxhwjBA-KTtEdCImUd9mycSGbx_3tytLv0JHPiV-xiY8TW571VMr_VcTqUD9_foXAbM5E6oxUAIjBunLTLDC8LkO4FSMGZ6HQKxR800j8k2lx-ugbvY61GywT977IMEJkOissiS3pP4jU-6w&sign=6Jx1KQ1MK7tggN1bXnz2uw&back=https%3A%2F%2Fvk.ru%2Fclub240781173&origin=&lang_id=
+[2026-10-16 07:49:00] TITLE Проверяем, что вы не робот
+[2026-10-16 07:49:01] CRITICAL VK STOP: VK_CHALLENGE
+[2026-10-16 07:51:10] ========================================================================
+[2026-10-16 07:51:10] VK WORKER UNIFIED START MODE=TEST
+[2026-10-16 07:51:10] GROUPS=1
+[2026-10-16 07:51:10] FLAGS production=False test_submit=False subscribe=False
+[2026-10-16 07:51:12] GROUP 1/1
+[2026-10-16 07:51:12] ========================================================================
+[2026-10-16 07:51:12] OPEN https://vk.ru/club240781173
+[2026-10-16 07:51:15] CRITICAL VK STOP: VK_CHALLENGE
+[2026-10-17 08:27:26] ========================================================================
+[2026-10-17 08:27:26] VK WORKER UNIFIED START MODE=TEST
+[2026-10-17 08:27:26] GROUPS=1
+[2026-10-17 08:27:26] FLAGS production=False test_submit=False subscribe=False
+[2026-10-17 08:27:29] GROUP 1/1
+[2026-10-17 08:27:29] ========================================================================
+[2026-10-17 08:27:29] OPEN https://vk.ru/club240781173
+[2026-10-17 08:27:51] FINAL URL https://vk.ru/club240781173
+[2026-10-17 08:27:51] TITLE Тест
+[2026-10-17 08:28:04] EDITOR TEXT VERIFIED
+[2026-10-17 08:28:07] NEXT CLICKED
+[2026-10-17 08:28:07] SUGGEST FINAL BUTTON UNIQUE
+[2026-10-17 08:28:07] STATE https://vk.ru/club240781173 -> TEST_READY_NOT_SUBMITTED
+[2026-10-17 08:28:07] TEST submit disabled: final click NOT performed
+[2026-10-17 08:34:38] ========================================================================
+[2026-10-17 08:34:38] VK WORKER UNIFIED START MODE=TEST
+[2026-10-17 08:34:38] GROUPS=1
+[2026-10-17 08:34:38] FLAGS production=False test_submit=True subscribe=False
+[2026-10-17 08:34:40] GROUP 1/1
+[2026-10-17 08:34:40] ========================================================================
+[2026-10-17 08:34:40] OPEN https://vk.ru/club240781173
+[2026-10-17 08:34:54] FINAL URL https://vk.ru/club240781173
+[2026-10-17 08:34:54] TITLE Тест
+[2026-10-17 08:35:13] EDITOR TEXT VERIFIED
+[2026-10-17 08:35:16] NEXT CLICKED
+[2026-10-17 08:35:16] SUGGEST FINAL BUTTON UNIQUE
+[2026-10-17 08:35:16] STATE https://vk.ru/club240781173 -> TEST_READY_NOT_SUBMITTED
+[2026-10-17 08:35:16] STATE https://vk.ru/club240781173 -> INTENT
+[2026-10-17 08:35:16] STATE https://vk.ru/club240781173 -> REMOTE_ATTEMPTED
+[2026-10-17 08:35:16] SUGGEST: REMOTE SUBMIT ONE ATTEMPT
+[2026-10-17 08:35:19] VK_NETWORK_OBSERVER responses=0 verified=False
+[2026-10-17 08:35:20] STATE https://vk.ru/club240781173 -> PROBABLE
+[2026-10-17 08:35:20] UNVERIFIED_CANDIDATES page=0 network=0
+[2026-10-17 08:35:20] SUGGEST: RESULT PROBABLE (FINAL_DIALOG_DISAPPEARED)
+[2026-10-17 10:02:41] ========================================================================
+[2026-10-17 10:02:41] VK WORKER UNIFIED START MODE=TEST
+[2026-10-17 10:02:41] GROUPS=1
+[2026-10-17 10:02:41] FLAGS production=False test_submit=False subscribe=False
+[2026-10-17 10:08:24] ========================================================================
+[2026-10-17 10:08:24] VK WORKER UNIFIED START MODE=TEST
+[2026-10-17 10:08:24] GROUPS=1
+[2026-10-17 10:08:24] FLAGS production=False test_submit=False subscribe=False
+[2026-10-17 10:08:26] GROUP 1/1
+[2026-10-17 10:08:26] ========================================================================
+[2026-10-17 10:08:26] OPEN https://vk.ru/club240781173
+[2026-10-17 10:08:48] FINAL URL https://vk.ru/club240781173
+[2026-10-17 10:08:48] TITLE Тест
+[2026-10-17 10:09:03] EDITOR TEXT VERIFIED
+[2026-10-17 10:09:06] NEXT CLICKED
+[2026-10-17 10:09:06] ERROR https://vk.ru/club240781173: RuntimeError('AUTHOR_SIGNATURE_SWITCH_NOT_UNIQUE')
+[2026-10-17 10:09:06] STATE https://vk.ru/club240781173 -> ERROR
+[2026-10-17 10:19:02] ========================================================================
+[2026-10-17 10:19:02] VK WORKER UNIFIED START MODE=TEST
+[2026-10-17 10:19:02] GROUPS=1
+[2026-10-17 10:19:02] FLAGS production=False test_submit=False subscribe=False
+[2026-10-17 10:19:04] GROUP 1/1
+[2026-10-17 10:19:04] ========================================================================
+[2026-10-17 10:19:04] OPEN https://vk.ru/club240781173
+[2026-10-17 10:19:25] FINAL URL https://vk.ru/club240781173
+[2026-10-17 10:19:25] TITLE Тест
+[2026-10-17 10:19:37] EDITOR TEXT VERIFIED
+[2026-10-17 10:19:41] NEXT CLICKED
+[2026-10-17 10:19:41] ERROR https://vk.ru/club240781173: RuntimeError('AUTHOR_SIGNATURE_SWITCH_NOT_UNIQUE')
+[2026-10-17 10:19:41] STATE https://vk.ru/club240781173 -> ERROR
+[2026-10-17 10:27:46] ========================================================================
+[2026-10-17 10:27:46] VK WORKER UNIFIED START MODE=TEST
+[2026-10-17 10:27:46] GROUPS=1
+[2026-10-17 10:27:46] FLAGS production=False test_submit=False subscribe=False
+[2026-10-17 10:27:48] GROUP 1/1
+[2026-10-17 10:27:48] ========================================================================
+[2026-10-17 10:27:48] OPEN https://vk.ru/club240781173
+[2026-10-17 10:28:06] FINAL URL https://vk.ru/club240781173
+[2026-10-17 10:28:06] TITLE Тест
+[2026-10-17 10:28:17] EDITOR TEXT VERIFIED
+[2026-10-17 10:28:19] NEXT CLICKED
+[2026-10-17 10:28:20] AUTHOR SIGNATURE ENABLED AND VERIFIED
+[2026-10-17 10:28:20] SUGGEST FINAL BUTTON UNIQUE
+[2026-10-17 10:28:20] STATE https://vk.ru/club240781173 -> TEST_READY_NOT_SUBMITTED
+[2026-10-17 10:28:20] TEST submit disabled: final click NOT performed
