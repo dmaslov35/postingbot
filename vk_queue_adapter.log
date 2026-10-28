@@ -1,0 +1,4 @@
+[2026-10-07 08:08:06] ADAPTER queue=TEST999001 account=main group=https://vk.ru/club240781173 flow=SUGGEST
+[2026-10-07 08:08:22] ADAPTER RuntimeError: WORKER_GROUP_RESULT_MISSING
+[2026-10-07 08:25:10] ADAPTER queue=TEST999003 account=main group=https://vk.ru/club240781173 flow=SUGGEST
+[2026-10-07 08:25:51] ADAPTER queue=TEST999003 result=PROBABLE flow=SUGGEST

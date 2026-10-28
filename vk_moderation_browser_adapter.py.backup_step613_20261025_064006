@@ -1,0 +1,81 @@
+
+"""Безопасный адаптер чтения стены VK через существующую страницу Playwright."""
+
+from urllib.parse import urlsplit
+
+from vk_moderation_wall_reader import STOP
+
+
+class BrowserWall:
+    def __init__(self, page):
+        self.page = page
+
+    def get(self, owner_id, count=100, offset=0):
+        if not STOP.is_file():
+            raise RuntimeError("PRODUCTION_STOP_REQUIRED")
+
+        if type(owner_id) is not int or owner_id >= 0:
+            raise ValueError("INVALID_COMMUNITY_OWNER")
+
+        if type(count) is not int or not 1 <= count <= 100:
+            raise ValueError("INVALID_COUNT")
+
+        if offset != 0:
+            raise ValueError("UNSUPPORTED_OFFSET")
+
+        url = f"https://vk.ru/wall{owner_id}"
+
+        self.page.goto(
+            url,
+            wait_until="domcontentloaded",
+            timeout=30000,
+        )
+
+        if not STOP.is_file():
+            raise RuntimeError("PRODUCTION_STOP_REMOVED")
+
+        if not urlsplit(self.page.url).netloc in ("vk.ru", "vk.com"):
+            raise RuntimeError("UNEXPECTED_VK_REDIRECT")
+
+        posts = self.page.locator(
+            '[data-post-id]'
+        )
+
+        items = []
+
+        for index in range(min(posts.count(), count)):
+            post = posts.nth(index)
+            raw_id = post.get_attribute("data-post-id")
+
+            if not isinstance(raw_id, str):
+                continue
+
+            expected_prefix = f"{owner_id}_"
+
+            if not raw_id.startswith(expected_prefix):
+                continue
+
+            post_id_text = raw_id[len(expected_prefix):]
+
+            if not post_id_text.isascii() or not post_id_text.isdecimal():
+                continue
+
+            post_id = int(post_id_text)
+
+            if post_id <= 0:
+                continue
+
+            text = post.inner_text(timeout=5000)
+
+            items.append({
+                "owner_id": owner_id,
+                "id": post_id,
+                "text": text,
+            })
+
+        return {"items": items}
+
+
+class BrowserVKClient:
+    def __init__(self, page):
+        self.wall = BrowserWall(page)

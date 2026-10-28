@@ -1,0 +1,52 @@
+"""Безопасный поиск кандидатов после модерации.
+
+Не обращается к VK, не подтверждает авторство и не разрешает удаление.
+"""
+from vk_moderation_matcher import match_moderated_post
+
+
+def discover_moderated_post(posts, expected_owner_id, expected_text):
+    result = {
+        "found": False,
+        "authorship_verified": False,
+        "deletion_allowed": False,
+        "post_url": None,
+        "vk_post_id": None,
+        "reason": "NO_MATCH",
+    }
+
+    if not isinstance(posts, list):
+        result["reason"] = "INVALID_POSTS"
+        return result
+
+    matches = []
+
+    for post in posts:
+        if not isinstance(post, dict):
+            continue
+
+        candidate = match_moderated_post(
+            post_url=post.get("post_url"),
+            expected_owner_id=expected_owner_id,
+            expected_text=expected_text,
+            actual_text=post.get("text"),
+        )
+
+        if candidate.get("matched") is True:
+            candidate["actual_text"] = post.get("text")
+            matches.append(candidate)
+
+    if len(matches) > 1:
+        result["reason"] = "AMBIGUOUS_MATCHES"
+        return result
+
+    if len(matches) == 1:
+        result.update({
+            "found": True,
+            "post_url": matches[0]["post_url"],
+            "vk_post_id": matches[0]["vk_post_id"],
+            "actual_text": matches[0]["actual_text"],
+            "reason": "SINGLE_TEXT_MATCH_UNVERIFIED",
+        })
+
+    return result

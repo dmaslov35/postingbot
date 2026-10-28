@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+"""Мониторинг публикаций VK: проверка, события, защита от повторов.
+
+Не выполняет сетевых запросов самостоятельно.
+Не отправляет сообщения и не изменяет базы данных.
+"""
+
+import hashlib
+from pathlib import Path
+
+from vk_moderation_api_reader import read_vk_post
+from vk_moderation_monitor import evaluate_candidate
+
+
+STOP = Path("/opt/vkbot/runtime/production.stop")
+
+
+def require_safe_mode():
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REQUIRED")
+
+
+def make_event_key(registry_id, vk_post_id, event_type):
+    raw = f"{registry_id}|{vk_post_id}|{event_type}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def prepare_notification(record, candidate):
+    require_safe_mode()
+
+    if not isinstance(record, dict):
+        raise ValueError("INVALID_RECORD")
+
+    if not isinstance(candidate, dict):
+        raise ValueError("INVALID_CANDIDATE")
+
+    required = (
+        "id",
+        "post_url",
+        "expected_owner_id",
+        "expected_text",
+    )
+
+    if any(key not in record for key in required):
+        raise ValueError("MISSING_RECORD_FIELDS")
+
+    if not candidate.get("found"):
+        return None
+
+    result = evaluate_candidate(
+        post_url=candidate["post_url"],
+        expected_owner_id=record["expected_owner_id"],
+        expected_text=record["expected_text"],
+        actual_text=candidate["actual_text"],
+    )
+
+    if not result["matched"]:
+        return None
+
+    assert result["authorship_verified"] is False
+    assert result["deletion_allowed"] is False
+
+    event_key = make_event_key(
+        record["id"],
+        candidate["vk_post_id"],
+        "MODERATION_CANDIDATE",
+    )
+
+    message = (
+        "🔎 Найдена публикация для проверки\n\n"
+        f"Запись реестра: {record['id']}\n"
+        f"Ссылка: {candidate['post_url']}\n\n"
+        "Текст объявления совпадает.\n"
+        "Авторство бота НЕ подтверждено.\n"
+        "Автоматическое удаление ЗАПРЕЩЕНО."
+    )
+
+    return {
+        "event_key": event_key,
+        "event_type": "MODERATION_CANDIDATE",
+        "registry_id": record["id"],
+        "post_url": candidate["post_url"],
+        "message": message,
+        "authorship_verified": False,
+        "deletion_allowed": False,
+    }
+
+
+def collect_notifications(records, candidates, delivered_keys=None):
+    require_safe_mode()
+
+    if delivered_keys is None:
+        delivered_keys = set()
+
+    events = []
+    seen = set(delivered_keys)
+
+    for record in records:
+        for candidate in candidates:
+            event = prepare_notification(record, candidate)
+
+            if event is None:
+                continue
+
+            if event["event_key"] in seen:
+                continue
+
+            seen.add(event["event_key"])
+            events.append(event)
+
+    return events
+
+
+def fetch_candidate(vk_client, post_url):
+    """Только явный вызов wall.getById через существующий reader.
+
+    Не вызывается автоматически при импорте или тестировании.
+    """
+    require_safe_mode()
+    return read_vk_post(vk_client, post_url)

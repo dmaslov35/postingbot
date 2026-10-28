@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""Telegram-уведомления мониторинга VK с защитой от повторов."""
+
+import json
+import sqlite3
+from pathlib import Path
+
+import requests
+
+
+BASE = Path("/opt/vkbot")
+STOP = BASE / "runtime/production.stop"
+CONFIG = BASE / "config.json"
+DB = BASE / "runtime/moderation_notifications.sqlite3"
+
+
+def require_safe_mode():
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REQUIRED")
+
+
+def load_telegram_config():
+    require_safe_mode()
+
+    config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    telegram = config["telegram"]
+
+    token = telegram["bot_token"]
+
+    if not isinstance(token, str) or not token.strip():
+        raise RuntimeError("INVALID_TELEGRAM_TOKEN")
+
+    recipients = telegram.get("admin_ids", [])
+
+    if not isinstance(recipients, list):
+        raise RuntimeError("INVALID_ADMIN_IDS")
+
+    recipients = list(dict.fromkeys(
+        str(x) for x in recipients
+        if str(x).strip()
+    ))
+
+    if not recipients:
+        admin_id = telegram.get("admin_id")
+        if admin_id:
+            recipients = [str(admin_id)]
+
+    if not recipients:
+        raise RuntimeError("NO_TELEGRAM_RECIPIENTS")
+
+    return token, recipients
+
+
+def connect_database():
+    require_safe_mode()
+
+    DB.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(DB, timeout=10)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            event_key TEXT NOT NULL,
+            recipient TEXT NOT NULL,
+            status TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            delivered_at TEXT,
+            PRIMARY KEY (event_key, recipient)
+        )
+    """)
+
+    conn.commit()
+    return conn
+
+
+def already_delivered(conn, event_key, recipient):
+    row = conn.execute(
+        """
+        SELECT status FROM notifications
+        WHERE event_key = ? AND recipient = ?
+        """,
+        (event_key, str(recipient)),
+    ).fetchone()
+
+    return bool(row and row[0] == "DELIVERED")
+
+
+def send_notification(event, dry_run=True):
+    require_safe_mode()
+
+    if not isinstance(event, dict):
+        raise ValueError("INVALID_EVENT")
+
+    if event.get("authorship_verified") is not False:
+        raise RuntimeError("UNSAFE_AUTHORSHIP_STATE")
+
+    if event.get("deletion_allowed") is not False:
+        raise RuntimeError("UNSAFE_DELETION_STATE")
+
+    if not event.get("event_key") or not event.get("message"):
+        raise ValueError("INVALID_NOTIFICATION")
+
+    token, recipients = load_telegram_config()
+
+    if dry_run:
+        return {
+            "mode": "DRY_RUN",
+            "recipient_count": len(recipients),
+            "event_key": event["event_key"],
+            "sent": 0,
+        }
+
+    raise RuntimeError(
+        "LIVE_DELIVERY_NOT_ENABLED: "
+        "requires delivery confirmation and retry safeguards"
+    )

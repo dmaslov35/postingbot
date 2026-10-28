@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""Чтение конкретной записи VK API без публикации и удаления."""
+
+from pathlib import Path
+
+from vk_post_identity import extract_post_identity
+
+
+STOP = Path("/opt/vkbot/runtime/production.stop")
+
+
+def read_vk_post(vk, post_url):
+    """Получает одну запись через wall.getById.
+
+    vk — заранее созданный VK API-клиент.
+    """
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REQUIRED")
+
+    identity = extract_post_identity(post_url)
+
+    if identity is None:
+        return {
+            "found": False,
+            "reason": "INVALID_POST_URL",
+            "authorship_verified": False,
+            "deletion_allowed": False,
+        }
+
+    response = vk.wall.getById(
+        posts=identity["vk_post_id"]
+    )
+
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REMOVED")
+
+    if not isinstance(response, list) or len(response) != 1:
+        return {
+            "found": False,
+            "reason": "POST_NOT_FOUND",
+            "authorship_verified": False,
+            "deletion_allowed": False,
+        }
+
+    post = response[0]
+
+    if not isinstance(post, dict):
+        raise RuntimeError("INVALID_API_RESPONSE")
+
+    try:
+        owner_id = int(post.get("owner_id"))
+        post_id = int(post.get("id"))
+    except (TypeError, ValueError):
+        raise RuntimeError("INVALID_POST_ID")
+
+    expected_id = identity["vk_post_id"]
+    actual_id = f"{owner_id}_{post_id}"
+
+    if actual_id != expected_id:
+        raise RuntimeError("POST_ID_MISMATCH")
+
+    actual_text = post.get("text")
+
+    if not isinstance(actual_text, str):
+        actual_text = ""
+
+    def optional_vk_id(field):
+        value = post.get(field)
+        if type(value) is int and value != 0:
+            return value
+        return None
+
+    return {
+        "found": True,
+        "reason": "POST_FOUND_UNVERIFIED",
+        "from_id": optional_vk_id("from_id"),
+        "signer_id": optional_vk_id("signer_id"),
+        "created_by": optional_vk_id("created_by"),
+        "vk_post_id": actual_id,
+        "post_url": identity["post_url"],
+        "actual_text": actual_text,
+        "authorship_verified": False,
+        "deletion_allowed": False,
+    }
+
+
+def assess_vk_authorship(post, expected_user_id, expected_owner_id, expected_post_id):
+    """Оценивает признаки авторства без разрешения удаления."""
+
+    result = {
+        "authorship_verified": False,
+        "deletion_allowed": False,
+        "reason": "AUTHORSHIP_UNVERIFIED",
+    }
+
+    if not isinstance(post, dict):
+        result["reason"] = "INVALID_POST"
+        return result
+
+    if type(expected_user_id) is not int or expected_user_id <= 0:
+        result["reason"] = "INVALID_ACCOUNT"
+        return result
+
+    if type(expected_owner_id) is not int or expected_owner_id >= 0:
+        result["reason"] = "INVALID_COMMUNITY"
+        return result
+
+    if type(expected_post_id) is not int or expected_post_id <= 0:
+        result["reason"] = "INVALID_POST_ID"
+        return result
+
+    if post.get("owner_id") != expected_owner_id:
+        result["reason"] = "OWNER_MISMATCH"
+        return result
+
+    if post.get("id") != expected_post_id:
+        result["reason"] = "POST_MISMATCH"
+        return result
+
+    creator = post.get("created_by")
+    signer = post.get("signer_id")
+
+    if type(creator) is int and creator > 0 and creator != expected_user_id:
+        result["reason"] = "CREATOR_MISMATCH"
+        return result
+
+    if type(signer) is int and signer > 0 and signer != expected_user_id:
+        result["reason"] = "SIGNER_MISMATCH"
+        return result
+
+    if type(creator) is int and creator == expected_user_id:
+        result["reason"] = "CREATOR_MATCH_REQUIRES_REVIEW"
+        return result
+
+    if type(signer) is int and signer == expected_user_id:
+        result["reason"] = "SIGNER_MATCH_REQUIRES_REVIEW"
+        return result
+
+    if post.get("from_id") == expected_owner_id:
+        result["reason"] = "COMMUNITY_AUTHOR_UNVERIFIED"
+
+    return result

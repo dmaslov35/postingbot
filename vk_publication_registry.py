@@ -40,6 +40,8 @@ ON publications(vk_post_id)
 WHERE vk_post_id IS NOT NULL;
 """
 
+NETWORK_CANDIDATES_SCHEMA = "\nCREATE TABLE IF NOT EXISTS network_post_candidates (\n id INTEGER PRIMARY KEY AUTOINCREMENT,\n queue_id INTEGER NOT NULL,\n account_id INTEGER NOT NULL,\n owner_id INTEGER CHECK(owner_id IS NULL OR owner_id != 0),\n vk_post_id INTEGER NOT NULL CHECK(vk_post_id > 0),\n source TEXT NOT NULL CHECK(source='VK_API_WALL_POST'),\n verified INTEGER NOT NULL DEFAULT 0 CHECK(verified=0),\n discovered_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,\n UNIQUE(queue_id, account_id, vk_post_id)\n);\n"
+
 def connect(db_path=DEFAULT_DB):
     path = Path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -61,6 +63,20 @@ def connect(db_path=DEFAULT_DB):
             UNIQUE(queue_id, vk_post_id)
         )
     """)
+    connection.executescript(NETWORK_CANDIDATES_SCHEMA)
+
+    columns = {
+        row[1]
+        for row in connection.execute(
+            "PRAGMA table_info(network_post_candidates)"
+        )
+    }
+    if "owner_id" not in columns:
+        connection.execute("""
+            ALTER TABLE network_post_candidates
+            ADD COLUMN owner_id INTEGER
+            CHECK(owner_id IS NULL OR owner_id != 0)
+        """)
     return connection
 
 def register_attempt(
@@ -73,13 +89,15 @@ def register_attempt(
         raise ValueError("Invalid initial state")
 
     with connect(db_path) as db:
-        db.execute("""
+        cursor = db.execute("""
             INSERT INTO publications
             (queue_id, account_id, group_url, flow, state)
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(queue_id) WHERE queue_id IS NOT NULL
             DO NOTHING
         """, (queue_id, account_id, group_url, flow, state))
+        if cursor.rowcount != 1:
+            raise RuntimeError("PUBLICATION_ATTEMPT_ALREADY_REGISTERED")
 
 def confirm_publication(
     queue_id, vk_post_id, post_url,
@@ -173,7 +191,7 @@ def save_post_candidates(
 
 
 def save_network_post_candidates(
-    queue_id, account_id, candidates, db_path=DEFAULT_DB
+    queue_id, account_id, candidates, db_path=DEFAULT_DB, owner_id=None
 ):
     """Сохраняет неподтверждённые post_id из сетевых ответов VK."""
 
@@ -182,6 +200,10 @@ def save_network_post_candidates(
 
     if type(account_id) is not int or account_id <= 0:
         raise ValueError("Invalid account_id")
+
+    if owner_id is not None:
+        if type(owner_id) is not int or owner_id == 0:
+            raise ValueError("Invalid owner_id")
 
     if not isinstance(candidates, list):
         raise ValueError("Candidates must be a list")
@@ -200,8 +222,91 @@ def save_network_post_candidates(
         for post_id in valid:
             db.execute("""
                 INSERT OR IGNORE INTO network_post_candidates
-                (queue_id, account_id, vk_post_id, source, verified)
-                VALUES (?, ?, ?, 'VK_API_WALL_POST', 0)
-            """, (queue_id, account_id, post_id))
+                (queue_id, account_id, vk_post_id, owner_id, source, verified)
+                VALUES (?, ?, ?, ?, 'VK_API_WALL_POST', 0)
+            """, (queue_id, account_id, post_id, owner_id))
 
     return len(valid)
+
+
+def save_network_proof_assessment(
+    queue_id, account_id, reason, post_id=None, db_path=DEFAULT_DB
+):
+    """Сохраняет оценку сетевых доказательств без подтверждения публикации."""
+
+    if type(queue_id) is not int or queue_id <= 0:
+        raise ValueError("Invalid queue_id")
+
+    if type(account_id) is not int or account_id <= 0:
+        raise ValueError("Invalid account_id")
+
+    if not isinstance(reason, str) or not reason or len(reason) > 200:
+        raise ValueError("Invalid proof reason")
+
+    if post_id is not None:
+        if type(post_id) is not int or post_id <= 0:
+            raise ValueError("Invalid post_id")
+
+    with connect(db_path) as db:
+        publication = db.execute("""
+            SELECT account_id, flow, state
+            FROM publications
+            WHERE queue_id = ?
+        """, (queue_id,)).fetchone()
+
+        if publication is None:
+            raise RuntimeError("PUBLICATION_ATTEMPT_NOT_REGISTERED")
+
+        if publication["account_id"] != account_id:
+            raise RuntimeError("PUBLICATION_ACCOUNT_MISMATCH")
+
+        if publication["flow"] != "CREATE":
+            raise RuntimeError("NETWORK_PROOF_REQUIRES_CREATE")
+
+        if publication["state"] not in (
+            "SUBMITTED",
+            "PENDING_MODERATION",
+            "REVIEW_REQUIRED",
+        ):
+            raise RuntimeError("PUBLICATION_INVALID_STATE")
+
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS network_proof_assessments (
+                queue_id INTEGER PRIMARY KEY,
+                account_id INTEGER NOT NULL,
+                reason TEXT NOT NULL,
+                vk_post_id INTEGER,
+                verified INTEGER NOT NULL DEFAULT 0
+                    CHECK(verified = 0),
+                deletion_authorized INTEGER NOT NULL DEFAULT 0
+                    CHECK(deletion_authorized = 0),
+                assessed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        existing = db.execute("""
+            SELECT account_id, reason, vk_post_id,
+                   verified, deletion_authorized
+            FROM network_proof_assessments
+            WHERE queue_id = ?
+        """, (queue_id,)).fetchone()
+
+        if existing is not None:
+            if (
+                existing["account_id"] == account_id
+                and existing["reason"] == reason
+                and existing["vk_post_id"] == post_id
+                and existing["verified"] == 0
+                and existing["deletion_authorized"] == 0
+            ):
+                return True
+            raise RuntimeError("NETWORK_PROOF_CONTEXT_MISMATCH")
+
+        db.execute("""
+            INSERT INTO network_proof_assessments
+            (queue_id, account_id, reason, vk_post_id,
+             verified, deletion_authorized)
+            VALUES (?, ?, ?, ?, 0, 0)
+        """, (queue_id, account_id, reason, post_id))
+
+    return True

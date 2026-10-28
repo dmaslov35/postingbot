@@ -1,0 +1,414 @@
+#!/usr/bin/env python3
+"""Безопасный монитор публикаций VK. Пока только чтение."""
+
+from pathlib import Path
+import sqlite3
+
+BASE = Path("/opt/vkbot")
+STOP = BASE / "runtime/production.stop"
+DB = BASE / "runtime/publications.sqlite3"
+
+TRACKED_STATES = (
+    "SUBMITTED",
+    "PENDING_MODERATION",
+    "REVIEW_REQUIRED",
+)
+
+
+def inspect_registry():
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REQUIRED")
+
+    if not DB.is_file():
+        raise RuntimeError("PUBLICATION_DATABASE_MISSING")
+
+    con = sqlite3.connect(DB.as_uri() + "?mode=ro", uri=True)
+    con.row_factory = sqlite3.Row
+
+    try:
+        rows = con.execute("""
+            SELECT
+                id,
+                queue_id,
+                account_id,
+                flow,
+                state,
+                vk_post_id,
+                post_url,
+                delete_after
+            FROM publications
+            WHERE state IN (?, ?, ?)
+            ORDER BY id
+        """, TRACKED_STATES).fetchall()
+
+        result = []
+
+        for row in rows:
+            item = dict(row)
+
+            if item["queue_id"] is None:
+                tracking_status = "HISTORICAL_REVIEW"
+            elif item["state"] == "PENDING_MODERATION":
+                tracking_status = "AWAITING_MODERATION"
+            elif item["state"] == "SUBMITTED":
+                tracking_status = "SUBMISSION_REVIEW"
+            else:
+                tracking_status = "MANUAL_REVIEW_REQUIRED"
+
+            item["tracking_status"] = tracking_status
+
+            item["authorship_verified"] = False
+            item["deletion_allowed"] = False
+
+            result.append(item)
+
+        return result
+
+    finally:
+        con.close()
+
+
+def main():
+    records = inspect_registry()
+    jobs = moderation_search_jobs()
+
+    print("=== VK MODERATION MONITOR ===")
+    print("SEARCH_JOBS:", len(jobs))
+    print("MODE: READ_ONLY")
+    print("TRACKED_RECORDS:", len(records))
+
+    for item in records:
+        print(
+            "RECORD:",
+            item["id"],
+            "FLOW:", item["flow"],
+            "STATE:", item["state"],
+            "TRACKING:", item["tracking_status"],
+        )
+
+        assert item["deletion_allowed"] is False
+        assert item["authorship_verified"] is False
+
+    assert STOP.is_file()
+
+    print("PASS: MONITOR_READ_ONLY")
+    print("PASS: PRODUCTION_STOP_PRESERVED")
+    print("NO VK REQUESTS")
+    print("NO DATABASE CHANGES")
+    print("NO PUBLICATIONS OR DELETIONS")
+
+
+
+def evaluate_candidate(
+    post_url,
+    expected_owner_id,
+    expected_text,
+    actual_text,
+):
+    """Сравнивает кандидата без подтверждения авторства."""
+    from vk_moderation_matcher import match_moderated_post
+
+    result = match_moderated_post(
+        post_url=post_url,
+        expected_owner_id=expected_owner_id,
+        expected_text=expected_text,
+        actual_text=actual_text,
+    )
+
+    assert result["authorship_verified"] is False
+    assert result["deletion_allowed"] is False
+
+    return result
+
+
+
+
+def find_publication_on_wall(vk_client, owner_id, expected_text):
+    """Ищет кандидата на стене без подтверждения авторства."""
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REQUIRED")
+
+    from vk_moderation_lookup import find_moderated_post
+
+    result = find_moderated_post(
+        vk=vk_client,
+        owner_id=owner_id,
+        expected_text=expected_text,
+    )
+
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REMOVED")
+
+    assert result["authorship_verified"] is False
+    assert result["deletion_allowed"] is False
+
+    return result
+
+
+
+def inspect_moderation_job(vk_client, job):
+    """Ищет публикацию одного задания без подтверждения авторства."""
+    from urllib.parse import urlsplit
+
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REQUIRED")
+
+    if not isinstance(job, dict):
+        raise ValueError("INVALID_MODERATION_JOB")
+
+    required = (
+        "publication_id",
+        "queue_id",
+        "account_id",
+        "group_url",
+        "flow",
+        "state",
+        "message_text",
+    )
+
+    if any(job.get(key) is None for key in required):
+        raise ValueError("INCOMPLETE_MODERATION_JOB")
+
+    if job["flow"] not in ("CREATE", "SUGGEST"):
+        raise ValueError("INVALID_PUBLICATION_FLOW")
+
+    if job["state"] not in TRACKED_STATES:
+        raise ValueError("INVALID_PUBLICATION_STATE")
+
+    url = urlsplit(str(job["group_url"]))
+
+    if (
+        url.scheme != "https"
+        or url.netloc not in ("vk.ru", "vk.com")
+        or url.query
+        or url.fragment
+        or not url.path.startswith(("/club", "/public"))
+    ):
+        raise ValueError("UNRESOLVED_COMMUNITY_ID")
+
+    group = url.path.strip("/")
+
+    if group.startswith("club"):
+        digits = group[4:]
+    elif group.startswith("public"):
+        digits = group[6:]
+    else:
+        raise ValueError("UNRESOLVED_COMMUNITY_ID")
+
+    if not digits.isascii() or not digits.isdecimal():
+        raise ValueError("UNRESOLVED_COMMUNITY_ID")
+
+    owner_id = -int(digits)
+
+    if owner_id >= 0:
+        raise ValueError("INVALID_COMMUNITY_OWNER")
+
+    if not isinstance(job["message_text"], str):
+        raise ValueError("INVALID_MESSAGE_TEXT")
+
+    if not job["message_text"].strip():
+        raise ValueError("EMPTY_MESSAGE_TEXT")
+
+    result = find_publication_on_wall(
+        vk_client=vk_client,
+        owner_id=owner_id,
+        expected_text=job["message_text"],
+    )
+
+    assert result["authorship_verified"] is False
+    assert result["deletion_allowed"] is False
+
+    return {
+        "publication_id": job["publication_id"],
+        "queue_id": job["queue_id"],
+        "found": result["found"],
+        "post_url": result.get("post_url"),
+        "vk_post_id": result.get("vk_post_id"),
+        "actual_text": result.get("actual_text"),
+        "reason": result["reason"],
+        "authorship_verified": False,
+        "deletion_allowed": False,
+    }
+
+
+
+def prepare_moderation_job_notification(job, search_result):
+    """Готовит уведомление о кандидате без отправки и удаления."""
+    from vk_moderation_pipeline import prepare_notification
+
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REQUIRED")
+
+    if not isinstance(job, dict):
+        raise ValueError("INVALID_MODERATION_JOB")
+
+    if not isinstance(search_result, dict):
+        raise ValueError("INVALID_SEARCH_RESULT")
+
+    if search_result.get("publication_id") != job.get("publication_id"):
+        raise ValueError("PUBLICATION_ID_MISMATCH")
+
+    if search_result.get("queue_id") != job.get("queue_id"):
+        raise ValueError("QUEUE_ID_MISMATCH")
+
+    if search_result.get("authorship_verified") is not False:
+        raise ValueError("UNSAFE_AUTHORSHIP_RESULT")
+
+    if search_result.get("deletion_allowed") is not False:
+        raise ValueError("UNSAFE_DELETION_RESULT")
+
+    if search_result.get("found") is not True:
+        return None
+
+    if not isinstance(search_result.get("actual_text"), str):
+        raise ValueError("ACTUAL_WALL_TEXT_REQUIRED")
+
+    if not search_result["actual_text"].strip():
+        raise ValueError("ACTUAL_WALL_TEXT_REQUIRED")
+
+    group_url = str(job.get("group_url", ""))
+
+    from urllib.parse import urlsplit
+    url = urlsplit(group_url)
+    group = url.path.strip("/")
+
+    if (
+        url.scheme != "https"
+        or url.netloc not in ("vk.ru", "vk.com")
+        or url.query
+        or url.fragment
+    ):
+        raise ValueError("INVALID_COMMUNITY_URL")
+
+    if group.startswith("club"):
+        digits = group[4:]
+    elif group.startswith("public"):
+        digits = group[6:]
+    else:
+        raise ValueError("UNRESOLVED_COMMUNITY_ID")
+
+    if not digits.isascii() or not digits.isdecimal():
+        raise ValueError("INVALID_COMMUNITY_ID")
+
+    owner_id = -int(digits)
+
+    if owner_id >= 0:
+        raise ValueError("INVALID_COMMUNITY_OWNER")
+
+    record = {
+        "id": job["publication_id"],
+        "account_id": job["account_id"],
+        "post_url": search_result["post_url"],
+        "expected_owner_id": owner_id,
+        "expected_text": job["message_text"],
+    }
+
+    candidate = {
+        "found": True,
+        "post_url": search_result["post_url"],
+        "vk_post_id": search_result["vk_post_id"],
+        "actual_text": search_result["actual_text"],
+    }
+
+    event = prepare_notification(record, candidate)
+
+    if event is not None:
+        assert event["authorship_verified"] is False
+        assert event["deletion_allowed"] is False
+
+    return event
+
+
+
+def process_moderation_job(vk_client, job):
+    """Ищет публикацию и готовит уведомление без отправки."""
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REQUIRED")
+
+    result = inspect_moderation_job(vk_client, job)
+
+    assert result["authorship_verified"] is False
+    assert result["deletion_allowed"] is False
+
+    event = prepare_moderation_job_notification(job, result)
+
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REMOVED")
+
+    if event is not None:
+        assert event["authorship_verified"] is False
+        assert event["deletion_allowed"] is False
+
+    return {
+        "publication_id": result["publication_id"],
+        "queue_id": result["queue_id"],
+        "found": result["found"],
+        "reason": result["reason"],
+        "event": event,
+        "authorship_verified": False,
+        "deletion_allowed": False,
+    }
+
+
+def moderation_search_jobs():
+    """Возвращает только записи с данными для поиска после модерации.
+
+    Не обращается к VK, не изменяет базы и не подтверждает авторство.
+    """
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REQUIRED")
+
+    queue_db = BASE / "vk_multi_account.sqlite3"
+    if not DB.is_file() or not queue_db.is_file():
+        raise RuntimeError("MODERATION_DATABASE_MISSING")
+
+    connection = sqlite3.connect(
+        f"file:{DB}?mode=ro", uri=True
+    )
+    connection.row_factory = sqlite3.Row
+
+    try:
+        connection.execute(
+            "ATTACH DATABASE ? AS queue_db",
+            (f"file:{queue_db}?mode=ro",)
+        )
+
+        rows = connection.execute("""
+            SELECT
+                p.id AS publication_id,
+                p.queue_id,
+                p.account_id,
+                p.group_url,
+                p.flow,
+                p.state,
+                q.message_text
+            FROM publications p
+            JOIN queue_db.queue q
+                ON q.id = p.queue_id
+            WHERE p.state IN (
+                'SUBMITTED',
+                'PENDING_MODERATION',
+                'REVIEW_REQUIRED'
+            )
+              AND p.queue_id IS NOT NULL
+              AND p.account_id IS NOT NULL
+              AND p.account_id = q.account_id
+              AND p.group_url = q.group_url
+              AND p.flow IN ('CREATE', 'SUGGEST')
+              AND q.message_text IS NOT NULL
+              AND TRIM(q.message_text) != ''
+            ORDER BY p.id
+        """).fetchall()
+
+        result = [dict(row) for row in rows]
+
+        if not STOP.is_file():
+            raise RuntimeError("PRODUCTION_STOP_REMOVED")
+
+        return result
+    finally:
+        connection.close()
+
+
+if __name__ == "__main__":
+    main()
