@@ -1,0 +1,48 @@
+"""Защита автоматического удаления публикаций VK.
+
+Не обращается к VK и не выполняет удаление.
+"""
+
+from vk_post_identity import extract_post_identity
+
+
+def assess_delete_permission(publication, proof=None):
+    """Проверяет возможность удаления. По умолчанию запрещает."""
+
+    result = {
+        "allowed": False,
+        "reason": "DELETE_NOT_AUTHORIZED",
+    }
+
+    if not isinstance(publication, dict):
+        result["reason"] = "INVALID_PUBLICATION"
+        return result
+
+    if publication.get("state") not in ("PUBLISHED", "DELETE_DUE"):
+        result["reason"] = "INVALID_STATE"
+        return result
+
+    identity = extract_post_identity(publication.get("post_url"))
+
+    if identity is None:
+        result["reason"] = "INVALID_POST_URL"
+        return result
+
+    if identity["vk_post_id"] != publication.get("vk_post_id"):
+        result["reason"] = "POST_ID_MISMATCH"
+        return result
+
+    if not publication.get("account_id"):
+        result["reason"] = "MISSING_ACCOUNT"
+        return result
+
+    if not publication.get("delete_after"):
+        result["reason"] = "MISSING_DELETE_TIME"
+        return result
+
+    # Внешние флаги proof={"verified": True} не считаются
+    # достоверным доказательством авторства.
+    # Разрешение будет реализовано только после появления
+    # независимой проверки через доверенный источник VK.
+    result["reason"] = "TRUSTED_AUTHORSHIP_PROOF_REQUIRED"
+    return result

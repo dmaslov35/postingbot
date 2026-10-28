@@ -1,0 +1,2548 @@
+import asyncio
+import os
+import json
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
+from pathlib import Path
+from datetime import datetime
+
+with open('config.json', 'r', encoding='utf-8') as f:
+    config = json.load(f)
+
+BOT_TOKEN = config['telegram']['bot_token']
+
+# Поддержка списка администраторов
+if 'admin_ids' in config['telegram']:
+    ADMIN_IDS = config['telegram']['admin_ids']
+else:
+    ADMIN_IDS = [config['telegram']['admin_id']]
+
+from account_lifecycle_lock import account_lifecycle_exclusive
+from posts_transaction_lock import published_posts_shared
+
+def load_config_fresh():
+    """Всегда читает актуальный config.json."""
+    with open('config.json', 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+
+def save_config_atomic(new_config):
+    """Атомарно сохраняет config.json и не оставляет временный файл."""
+    import tempfile
+
+    config_path = os.path.abspath('config.json')
+    config_dir = os.path.dirname(config_path)
+
+    fd, tmp_path = tempfile.mkstemp(
+        prefix='.config.',
+        suffix='.tmp',
+        dir=config_dir,
+        text=True,
+    )
+
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(
+                new_config,
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
+            f.flush()
+            os.fsync(f.fileno())
+
+        os.chmod(tmp_path, 0o600)
+        os.replace(tmp_path, config_path)
+        os.chmod(config_path, 0o600)
+
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+# CONFIG TRANSACTION CORE V1
+CONFIG_LOCK_PATH = "/opt/vkbot/.config.lock"
+
+
+def mutate_config_locked(mutator):
+    """
+    Serialize read-modify-write operations on config.json.
+
+    mutator(cfg) may modify cfg in memory and return
+    any result needed by the caller.
+
+    The lock covers:
+        fresh load
+        mutation
+        atomic save
+
+    No VK API calls are performed here.
+    """
+    import fcntl
+
+    lock_path = CONFIG_LOCK_PATH
+
+    with open(
+        lock_path,
+        "a+",
+        encoding="utf-8",
+    ) as lock_file:
+        os.chmod(lock_path, 0o600)
+
+        fcntl.flock(
+            lock_file.fileno(),
+            fcntl.LOCK_EX,
+        )
+
+        try:
+            cfg = load_config_fresh()
+
+            if not isinstance(cfg, dict):
+                raise ValueError(
+                    "config root is not an object"
+                )
+
+            changed, result = mutator(cfg)
+
+            if changed:
+                save_config_atomic(cfg)
+
+            return result
+
+        finally:
+            fcntl.flock(
+                lock_file.fileno(),
+                fcntl.LOCK_UN,
+            )
+
+
+# ACCOUNT TRANSACTION OPERATIONS V1
+# CALLBACK MIGRATION V1
+
+
+def _normalize_vk_user_id(user_id):
+    try:
+        value = int(user_id)
+    except (TypeError, ValueError):
+        return None
+
+    if value <= 0:
+        return None
+
+    return value
+
+
+def _find_account_index_by_user_id(accounts, user_id):
+    target = _normalize_vk_user_id(user_id)
+
+    if target is None:
+        return None
+
+    if not isinstance(accounts, list):
+        return None
+
+    for index, account in enumerate(accounts):
+        if not isinstance(account, dict):
+            continue
+
+        current = _normalize_vk_user_id(
+            account.get("user_id")
+        )
+
+        if current == target:
+            return index
+
+    return None
+
+
+# SAFETY HELPERS RESTORED V1
+
+def validate_account_for_enable(account):
+    """
+    Offline-only validation.
+    Does NOT call VK API.
+    """
+    errors = []
+
+    if not isinstance(account, dict):
+        return False, [
+            "Некорректная структура аккаунта."
+        ]
+
+    user_id = _normalize_vk_user_id(
+        account.get("user_id")
+    )
+
+    if user_id is None:
+        errors.append(
+            "Некорректный VK ID."
+        )
+
+    token = account.get("token")
+
+    if (
+        not isinstance(token, str)
+        or not token.strip()
+    ):
+        errors.append(
+            "Токен не установлен."
+        )
+
+    phone = account.get("phone")
+
+    if (
+        not isinstance(phone, str)
+        or not phone.strip()
+    ):
+        errors.append(
+            "Телефон не указан."
+        )
+
+    return len(errors) == 0, errors
+
+
+def get_pending_posts_for_account(user_id):
+    """
+    Fail-closed local queue check.
+    Does NOT call VK API.
+
+    Returns:
+      >= 0  number of unfinished posts
+      -1    queue cannot be checked safely
+    """
+    normalized_user_id = (
+        _normalize_vk_user_id(user_id)
+    )
+
+    if normalized_user_id is None:
+        return -1
+
+    target = str(normalized_user_id)
+
+    with published_posts_shared():
+        try:
+            with open(
+                "published_posts.json",
+                "r",
+                encoding="utf-8",
+            ) as f:
+                posts = json.load(f)
+
+        except FileNotFoundError:
+            return 0
+
+        except Exception:
+            return -1
+
+    if not isinstance(posts, list):
+        return -1
+
+    count = 0
+
+    for post in posts:
+        if not isinstance(post, dict):
+            continue
+
+        post_user_id = (
+            _normalize_vk_user_id(
+                post.get("account_user_id")
+            )
+        )
+
+        if post_user_id is None:
+            continue
+
+        if str(post_user_id) != target:
+            continue
+
+        status = str(
+            post.get(
+                "status",
+                "pending",
+            )
+        ).lower()
+
+        if status not in {
+            "deleted",
+            "not_found",
+        }:
+            count += 1
+
+    return count
+
+
+def tx_add_vk_account_disabled(user_id, phone):
+    normalized_id = _normalize_vk_user_id(user_id)
+
+    if normalized_id is None:
+        return {
+            "status": "bad_user_id",
+        }
+
+    if not isinstance(phone, str):
+        return {
+            "status": "bad_phone",
+        }
+
+    normalized_phone = phone.strip()
+
+    if (
+        not normalized_phone
+        or len(normalized_phone) > 40
+    ):
+        return {
+            "status": "bad_phone",
+        }
+
+    def mutator(cfg):
+        accounts = cfg.get("vk_accounts")
+
+        if not isinstance(accounts, list):
+            raise ValueError(
+                "vk_accounts is not a list"
+            )
+
+        index = _find_account_index_by_user_id(
+            accounts,
+            normalized_id,
+        )
+
+        if index is not None:
+            return False, {
+                "status": "duplicate",
+                "user_id": normalized_id,
+            }
+
+        accounts.append({
+            "user_id": normalized_id,
+            "phone": normalized_phone,
+            "token": "",
+            "enabled": False,
+        })
+
+        return True, {
+            "status": "saved",
+            "user_id": normalized_id,
+        }
+
+    return mutate_config_locked(mutator)
+
+
+def tx_disable_vk_account(user_id):
+    normalized_id = _normalize_vk_user_id(user_id)
+
+    if normalized_id is None:
+        return {
+            "status": "bad_user_id",
+        }
+
+    def mutator(cfg):
+        accounts = cfg.get("vk_accounts")
+
+        if not isinstance(accounts, list):
+            raise ValueError(
+                "vk_accounts is not a list"
+            )
+
+        index = _find_account_index_by_user_id(
+            accounts,
+            normalized_id,
+        )
+
+        if index is None:
+            return False, {
+                "status": "not_found",
+            }
+
+        if accounts[index].get("enabled") is False:
+            return False, {
+                "status": "disabled",
+                "user_id": normalized_id,
+            }
+
+        accounts[index]["enabled"] = False
+
+        return True, {
+            "status": "disabled",
+            "user_id": normalized_id,
+        }
+
+    with account_lifecycle_exclusive(normalized_id):
+        return mutate_config_locked(mutator)
+
+
+def tx_set_vk_account_enabled(user_id, enabled):
+    normalized_id = _normalize_vk_user_id(user_id)
+
+    if normalized_id is None:
+        return {
+            "status": "bad_user_id",
+        }
+
+    desired = bool(enabled)
+
+    def mutator(cfg):
+        accounts = cfg.get("vk_accounts")
+
+        if not isinstance(accounts, list):
+            raise ValueError(
+                "vk_accounts is not a list"
+            )
+
+        index = _find_account_index_by_user_id(
+            accounts,
+            normalized_id,
+        )
+
+        if index is None:
+            return False, {
+                "status": "not_found",
+            }
+
+        account = accounts[index]
+
+        if desired:
+            ready, errors = (
+                validate_account_for_enable(
+                    account
+                )
+            )
+
+            if not ready:
+                changed = (
+                    account.get("enabled")
+                    is not False
+                )
+
+                account["enabled"] = False
+
+                return changed, {
+                    "status": "not_ready",
+                    "user_id": normalized_id,
+                    "errors": list(errors),
+                }
+
+        if account.get("enabled") is desired:
+            return False, {
+                "status": (
+                    "enabled"
+                    if desired
+                    else "disabled"
+                ),
+                "user_id": normalized_id,
+            }
+
+        account["enabled"] = desired
+
+        return True, {
+            "status": (
+                "enabled"
+                if desired
+                else "disabled"
+            ),
+            "user_id": normalized_id,
+        }
+
+    with account_lifecycle_exclusive(normalized_id):
+        return mutate_config_locked(mutator)
+
+
+
+def tx_delete_vk_account(user_id):
+    normalized_user_id = _normalize_vk_user_id(user_id)
+
+    if normalized_user_id is None:
+        return {
+            "status": "bad_user_id",
+            "user_id": user_id,
+        }
+
+    with account_lifecycle_exclusive(
+        normalized_user_id
+    ):
+        # Phase 1:
+        # inspect the CURRENT config under CONFIG EX.
+        # If enabled, this action only disables it.
+        def inspect_or_disable(cfg):
+            accounts = cfg.get("vk_accounts")
+
+            if not isinstance(accounts, list):
+                return False, {
+                    "status": "bad_config",
+                    "user_id": normalized_user_id,
+                }
+
+            index = _find_account_index_by_user_id(
+                accounts,
+                normalized_user_id,
+            )
+
+            if index is None:
+                return False, {
+                    "status": "not_found",
+                    "user_id": normalized_user_id,
+                }
+
+            account = accounts[index]
+
+            if account.get("enabled") is True:
+                account["enabled"] = False
+
+                return True, {
+                    "status": "disabled_first",
+                    "user_id": normalized_user_id,
+                }
+
+            return False, {
+                "status": "ready_for_queue_check",
+                "user_id": normalized_user_id,
+            }
+
+        first_result = mutate_config_locked(
+            inspect_or_disable
+        )
+
+        if not isinstance(first_result, dict):
+            return {
+                "status": "bad_config",
+                "user_id": normalized_user_id,
+            }
+
+        if (
+            first_result.get("status")
+            != "ready_for_queue_check"
+        ):
+            return first_result
+
+        # ACCOUNT EX is still held here.
+        #
+        # Any publication for this UID requires ACCOUNT SH
+        # and holds it through save_new_post(), therefore
+        # no same-UID post can appear between this queue
+        # check and the final config transaction.
+        #
+        # CONFIG is NOT held while POSTS SH is acquired.
+        pending = get_pending_posts_for_account(
+            normalized_user_id
+        )
+
+        if pending < 0:
+            return {
+                "status": "queue_error",
+                "user_id": normalized_user_id,
+            }
+
+        if pending > 0:
+            return {
+                "status": "pending_posts",
+                "user_id": normalized_user_id,
+                "pending_posts": pending,
+            }
+
+        # Phase 2:
+        # ACCOUNT EX is still held.
+        # Re-open CONFIG EX only after POSTS SH has been
+        # released by get_pending_posts_for_account().
+        #
+        # Revalidate everything against fresh config.
+        def hard_delete(cfg):
+            accounts = cfg.get("vk_accounts")
+
+            if not isinstance(accounts, list):
+                return False, {
+                    "status": "bad_config",
+                    "user_id": normalized_user_id,
+                }
+
+            index = _find_account_index_by_user_id(
+                accounts,
+                normalized_user_id,
+            )
+
+            if index is None:
+                return False, {
+                    "status": "not_found",
+                    "user_id": normalized_user_id,
+                }
+
+            account = accounts[index]
+
+            # Fail closed if state unexpectedly changed.
+            if account.get("enabled") is True:
+                return False, {
+                    "status": "state_changed",
+                    "user_id": normalized_user_id,
+                }
+
+            accounts.pop(index)
+
+            return True, {
+                "status": "deleted",
+                "user_id": normalized_user_id,
+            }
+
+        return mutate_config_locked(hard_delete)
+
+
+
+# RESTORED UI HELPERS V2
+
+def get_vk_accounts():
+    cfg = load_config_fresh()
+    accounts = cfg.get('vk_accounts', [])
+
+    if not isinstance(accounts, list):
+        return []
+
+    return accounts
+
+
+def account_label(account, index):
+    user_id = account.get('user_id')
+    enabled = account.get('enabled', True)
+
+    emoji = '🟢' if enabled else '⏸️'
+
+    if user_id:
+        return f"{emoji} #{index + 1} · ID {user_id}"
+
+    return f"{emoji} #{index + 1} · без ID"
+
+
+
+async def show_accounts_menu(query):
+    accounts = get_vk_accounts()
+
+    if not accounts:
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "➕ Добавить аккаунт",
+                    callback_data="account_add",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "🔄 Обновить",
+                    callback_data="accounts",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "◀️ Назад",
+                    callback_data="main_menu",
+                )
+            ],
+        ]
+
+        await query.edit_message_text(
+            "👥 VK-аккаунты\n\n"
+            "Список аккаунтов пуст.",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return
+
+    keyboard = []
+
+    for index, account in enumerate(accounts):
+        user_id = _normalize_vk_user_id(
+            account.get("user_id")
+        )
+
+        # Invalid records must never receive a mutable
+        # account callback.
+        if user_id is None:
+            continue
+
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    account_label(account, index),
+                    callback_data=(
+                        f"account_view_uid_{user_id}"
+                    ),
+                )
+            ]
+        )
+
+    keyboard.extend(
+        [
+            [
+                InlineKeyboardButton(
+                    "➕ Добавить аккаунт",
+                    callback_data="account_add",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "🔄 Обновить",
+                    callback_data="accounts",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "◀️ Назад",
+                    callback_data="main_menu",
+                )
+            ],
+        ]
+    )
+
+    await query.edit_message_text(
+        "👥 VK-аккаунты\n\n"
+        f"Всего: {len(accounts)}",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+
+
+async def show_account_card(query, user_id):
+    normalized_user_id = _normalize_vk_user_id(user_id)
+
+    if normalized_user_id is None:
+        await query.edit_message_text(
+            "⚠️ Некорректный VK ID.\n\n"
+            "Обновите список аккаунтов.",
+            reply_markup=InlineKeyboardMarkup(
+                [[
+                    InlineKeyboardButton(
+                        "◀️ К аккаунтам",
+                        callback_data="accounts",
+                    )
+                ]]
+            ),
+        )
+        return
+
+    accounts = get_vk_accounts()
+
+    index = _find_account_index_by_user_id(
+        accounts,
+        normalized_user_id,
+    )
+
+    if index is None:
+        await query.edit_message_text(
+            "⚠️ Аккаунт больше не найден.\n\n"
+            "Список был изменён другим действием. "
+            "Обновите его.",
+            reply_markup=InlineKeyboardMarkup(
+                [[
+                    InlineKeyboardButton(
+                        "◀️ К аккаунтам",
+                        callback_data="accounts",
+                    )
+                ]]
+            ),
+        )
+        return
+
+    account = accounts[index]
+
+    phone = account.get("phone") or "не указан"
+    enabled = account.get("enabled") is True
+    token = account.get("token")
+
+    status = "🟢 включён" if enabled else "⚪ выключен"
+    token_status = (
+        "✅ установлен"
+        if isinstance(token, str) and token.strip()
+        else "❌ не установлен"
+    )
+
+    text = (
+        f"👤 VK-аккаунт #{index + 1}\n\n"
+        f"ID: {normalized_user_id}\n"
+        f"Телефон: {phone}\n"
+        f"Статус: {status}\n"
+        f"Токен: {token_status}"
+    )
+
+    keyboard = []
+
+    if enabled:
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    "⏸ Выключить",
+                    callback_data=(
+                        f"account_disable_uid_"
+                        f"{normalized_user_id}"
+                    ),
+                )
+            ]
+        )
+    else:
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    "▶️ Включить",
+                    callback_data=(
+                        f"account_enable_ask_uid_"
+                        f"{normalized_user_id}"
+                    ),
+                )
+            ]
+        )
+
+    keyboard.append(
+        [
+            InlineKeyboardButton(
+                "🗑 Удалить",
+                callback_data=(
+                    f"account_delete_ask_uid_"
+                    f"{normalized_user_id}"
+                ),
+            )
+        ]
+    )
+
+    keyboard.append(
+        [
+            InlineKeyboardButton(
+                "◀️ К аккаунтам",
+                callback_data="accounts",
+            )
+        ]
+    )
+
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+
+
+# ============================================================
+# VK WORKER PANEL V1
+# READ ONLY / PRODUCTION LOCKED
+#
+# Этот раздел:
+# - НЕ запускает VK Worker
+# - НЕ публикует посты
+# - НЕ подписывается
+# - НЕ отправляет заявки
+# - НЕ включает Production
+# ============================================================
+
+VK_WORKER_DIR = Path(
+    os.environ.get("VK_WORKER_DIR", "/opt/vkbot")
+)
+
+VK_WORKER_STATE_FILES = [
+    VK_WORKER_DIR / "vk_worker_final_state.json",
+    VK_WORKER_DIR / "vk_worker_v3_state.json",
+]
+
+VK_WORKER_LOG_FILES = [
+    VK_WORKER_DIR / "vk_worker_final.log",
+    VK_WORKER_DIR / "vk_worker_v3.log",
+]
+
+
+def _vk_worker_existing(paths):
+    for path in paths:
+        try:
+            if path.exists():
+                return path
+        except Exception:
+            pass
+
+    return None
+
+
+def _vk_worker_load_json(path):
+    if path is None:
+        return None
+
+    try:
+        with path.open(
+            "r",
+            encoding="utf-8",
+        ) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _vk_worker_rows(data):
+    if not isinstance(data, dict):
+        return []
+
+    # Поддерживаем несколько форматов state-файлов.
+    for key in (
+        "groups",
+        "states",
+        "items",
+        "results",
+    ):
+        value = data.get(key)
+
+        if isinstance(value, dict):
+            rows = []
+
+            for url, item in value.items():
+                if not isinstance(item, dict):
+                    continue
+
+                row = dict(item)
+                row.setdefault("url", url)
+                rows.append(row)
+
+            return rows
+
+        if isinstance(value, list):
+            return [
+                item
+                for item in value
+                if isinstance(item, dict)
+            ]
+
+    # Некоторые версии worker хранят:
+    # URL -> state прямо в корне JSON.
+    rows = []
+
+    for url, item in data.items():
+        if (
+            isinstance(url, str)
+            and url.startswith("http")
+            and isinstance(item, dict)
+        ):
+            row = dict(item)
+            row.setdefault("url", url)
+            rows.append(row)
+
+    return rows
+
+
+def vk_worker_status_text():
+    state_path = _vk_worker_existing(VK_WORKER_STATE_FILES)
+    log_path = _vk_worker_existing(VK_WORKER_LOG_FILES)
+
+    state_data = _vk_worker_load_json(state_path)
+
+    lines = [
+        "🤖 VK Worker",
+        "",
+        "🔒 Production: ЗАБЛОКИРОВАН",
+    ]
+
+    if state_path is None:
+        lines.extend([
+            "",
+            "📊 State-файл worker пока не найден на сервере.",
+        ])
+
+    elif not isinstance(state_data, dict):
+        lines.extend([
+            "",
+            f"📊 State: {state_path.name}",
+            "❌ State-файл не удалось прочитать.",
+        ])
+
+    else:
+        updated_at = state_data.get("updated_at") or "—"
+        source = state_data.get("source", "unknown")
+
+        worker_running = bool(
+            state_data.get("worker_running", False)
+        )
+
+        worker_file = (
+            state_data.get("worker_file")
+            or "—"
+        )
+
+        groups_total = state_data.get(
+            "groups_total",
+            0,
+        )
+
+        groups_in_state = state_data.get(
+            "groups_in_state",
+            0,
+        )
+
+        create_count = state_data.get(
+            "create_count",
+            0,
+        )
+
+        suggest_count = state_data.get(
+            "suggest_count",
+            0,
+        )
+
+        subscribed_count = state_data.get(
+            "subscribed_count",
+            0,
+        )
+
+        not_subscribed_count = state_data.get(
+            "not_subscribed_count",
+            0,
+        )
+
+        unknown_subscription_count = state_data.get(
+            "unknown_subscription_count",
+            0,
+        )
+
+        error_count = state_data.get(
+            "error_count",
+            0,
+        )
+
+        scan_status = state_data.get(
+            "last_scan_status",
+            "NOT_FOUND",
+        )
+
+        scan_finished = state_data.get(
+            "last_scan_finished_at"
+        ) or "—"
+
+        post_attempts = state_data.get(
+            "post_attempts",
+            0,
+        )
+
+        def fmt_time(value):
+            if not value or value == "—":
+                return "—"
+
+            try:
+                dt = datetime.fromisoformat(
+                    str(value)
+                )
+                return dt.strftime(
+                    "%d.%m.%Y %H:%M:%S"
+                )
+            except Exception:
+                return str(value)
+
+        scan_label = {
+            "COMPLETED": "ЗАВЕРШЁН",
+            "NOT_FOUND": "НЕТ ДАННЫХ",
+        }.get(
+            str(scan_status).upper(),
+            str(scan_status),
+        )
+
+        worker_label = (
+            "ONLINE"
+            if worker_running
+            else "ОСТАНОВЛЕН"
+        )
+
+        lines.extend([
+            f"💻 Windows Worker: {worker_label}",
+            f"📄 Worker: {worker_file}",
+            "",
+            f"🕒 Последний отчёт: {fmt_time(updated_at)}",
+            f"✅ Последний SCAN: {scan_label}",
+            f"🕒 SCAN завершён: {fmt_time(scan_finished)}",
+            "",
+            f"📋 Групп в списке: {groups_total}",
+            f"📊 Групп со статусом: {groups_in_state}",
+            "",
+            f"📝 CREATE: {create_count}",
+            f"📨 SUGGEST: {suggest_count}",
+            "",
+            f"🟢 Подписаны: {subscribed_count}",
+            f"⚪ Не подписаны: {not_subscribed_count}",
+            f"❔ Статус неизвестен: {unknown_subscription_count}",
+            f"❌ Ошибок: {error_count}",
+            "",
+            f"🚫 POST ATTEMPTS: {post_attempts}",
+            "",
+            "🛡 Публикация из Telegram: ОТКЛЮЧЕНА",
+            "🛡 Подписки из Telegram: ОТКЛЮЧЕНЫ",
+            "🛡 Join-заявки из Telegram: ОТКЛЮЧЕНЫ",
+            "🛡 CREATE submit: ОТКЛЮЧЕН",
+            "",
+            f"📊 State: {state_path.name}",
+            f"💻 Источник: {source}",
+        ])
+
+    lines.append("")
+
+    if log_path is None:
+        lines.append(
+            "📈 Worker log: пока не найден"
+        )
+    else:
+        lines.append(
+            f"📈 Worker log: {log_path.name}"
+        )
+
+    lines.extend([
+        "",
+        "🎛 Управление: только START/STOP безопасного SCAN.",
+        "🔒 Публикация и другие изменения VK заблокированы.",
+    ])
+
+    return "\n".join(lines)
+
+def vk_worker_log_text():
+    path = _vk_worker_existing(
+        VK_WORKER_LOG_FILES
+    )
+
+    if path is None:
+        return (
+            "📈 Лог VK Worker пока "
+            "не найден на сервере."
+        )
+
+    try:
+        with path.open(
+            "r",
+            encoding="utf-8",
+            errors="replace",
+        ) as f:
+            lines = f.readlines()
+
+        tail = "".join(
+            lines[-20:]
+        ).strip()
+
+    except Exception as exc:
+        return (
+            "❌ Не удалось прочитать "
+            "worker log.\n\n"
+            f"Ошибка: {type(exc).__name__}"
+        )
+
+    if not tail:
+        tail = "(лог пуст)"
+
+    # Не превышаем безопасный размер
+    # сообщения Telegram.
+    if len(tail) > 3200:
+        tail = tail[-3200:]
+
+    return (
+        f"📈 Последние строки "
+        f"{path.name}\n\n"
+        f"{tail}"
+    )
+
+
+
+# ============================================================
+# VK WORKER REMOTE SCAN CONTROL V1
+# ONLY SCAN_START / SCAN_STOP
+# ============================================================
+
+VK_WORKER_COMMAND_FILE = (
+    VK_WORKER_DIR / "vk_worker_command.json"
+)
+
+VK_WORKER_ALLOWED_COMMANDS = {
+    "SCAN_START",
+    "SCAN_STOP",
+}
+
+
+def vk_worker_write_command(command, admin_id=None):
+    command = str(command).strip().upper()
+
+    if command not in VK_WORKER_ALLOWED_COMMANDS:
+        raise ValueError(
+            f"VK Worker command is not allowed: {command}"
+        )
+
+    request_id = datetime.now().strftime(
+        "%Y%m%d%H%M%S%f"
+    )
+
+    payload = {
+        "id": request_id,
+        "command": command,
+        "created_at": datetime.now().isoformat(
+            timespec="seconds"
+        ),
+        "source": "telegram_admin",
+        "admin_id": admin_id,
+    }
+
+    tmp_path = VK_WORKER_COMMAND_FILE.with_name(
+        VK_WORKER_COMMAND_FILE.name + ".tmp"
+    )
+
+    with tmp_path.open(
+        "w",
+        encoding="utf-8",
+    ) as f:
+        json.dump(
+            payload,
+            f,
+            ensure_ascii=False,
+            indent=2,
+        )
+        f.flush()
+        os.fsync(f.fileno())
+
+    os.replace(
+        tmp_path,
+        VK_WORKER_COMMAND_FILE,
+    )
+
+    return payload
+
+
+async def show_vk_worker_menu(query):
+    state_path = _vk_worker_existing(
+        VK_WORKER_STATE_FILES
+    )
+    state_data = _vk_worker_load_json(
+        state_path
+    )
+
+    worker_running = False
+    controller_enabled = False
+
+    if isinstance(state_data, dict):
+        worker_running = bool(
+            state_data.get(
+                "worker_running",
+                False,
+            )
+        )
+        controller_enabled = bool(
+            state_data.get(
+                "controller_enabled",
+                False,
+            )
+        )
+
+    keyboard = []
+
+    if controller_enabled:
+        if worker_running:
+            keyboard.append([
+                InlineKeyboardButton(
+                    "⏹ Остановить SCAN",
+                    callback_data="vk_worker_scan_stop",
+                )
+            ])
+        else:
+            keyboard.append([
+                InlineKeyboardButton(
+                    "▶️ Запустить SCAN",
+                    callback_data="vk_worker_scan_start",
+                )
+            ])
+
+    keyboard.extend([
+        [
+            InlineKeyboardButton(
+                "🔄 Обновить статус",
+                callback_data="vk_worker_status",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "📈 Последние строки лога",
+                callback_data="vk_worker_log",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "◀️ Назад",
+                callback_data="main_menu",
+            )
+        ],
+    ])
+
+    await query.message.edit_text(
+        vk_worker_status_text(),
+        reply_markup=InlineKeyboardMarkup(
+            keyboard
+        ),
+    )
+
+
+def load_settings():
+    try:
+        with open('settings.json', 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return {'post_interval': 30, 'check_interval': 7200, 'delete_delay': 10}
+
+def save_settings(settings):
+    with open('settings.json', 'w', encoding='utf-8') as f:
+        json.dump(settings, f, ensure_ascii=False, indent=2)
+
+def load_stats():
+    try:
+        with open('bot_stats.json', 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return {'success': 0, 'errors': [], 'accounts_status': {}}
+
+def load_groups():
+    try:
+        from openpyxl import load_workbook
+        wb = load_workbook('chats.xlsx')
+        sheet = wb.active
+        groups = []
+        for row in sheet.iter_rows(min_row=2, values_only=True):
+            if row[0]:
+                groups.append(int(row[0]))
+        return groups
+    except:
+        return []
+
+def load_messages():
+    try:
+        from openpyxl import load_workbook
+        wb = load_workbook('messages.xlsx')
+        sheet = wb.active
+        messages = []
+        for row in sheet.iter_rows(min_row=2, values_only=True):
+            if row[0]:
+                messages.append(str(row[0]))
+        return messages
+    except:
+        return []
+
+def save_messages(messages):
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Messages'
+    ws.append(['message'])
+    for msg in messages:
+        ws.append([msg])
+    wb.save('messages.xlsx')
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS:
+        await update.message.reply_text("❌ Доступ запрещён")
+        return
+    await show_main_menu(update, context)
+
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("📝 Тексты", callback_data='messages_menu')],
+        [InlineKeyboardButton("⏱️ Настройки времени", callback_data='settings_menu')],
+        [InlineKeyboardButton("📋 Группы со ссылками", callback_data='groups_menu')],
+        [InlineKeyboardButton("📊 Статистика", callback_data='stats')],
+        [InlineKeyboardButton("👥 Аккаунты", callback_data='accounts')],
+        [InlineKeyboardButton("🤖 VK Worker", callback_data='vk_worker')],
+        [InlineKeyboardButton("📈 Логи", callback_data='logs')],
+        [InlineKeyboardButton("⏸️ Пауза", callback_data='pause'),
+         InlineKeyboardButton("▶️ Продолжить", callback_data='resume')],
+        [InlineKeyboardButton("🔄 Перезапуск", callback_data='restart')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    if update.callback_query:
+        await update.callback_query.message.edit_text("🤖 Панель управления ВК-ботом\n\nВыберите действие:", reply_markup=reply_markup)
+    else:
+        await update.message.reply_text("🤖 Панель управления ВК-ботом\n\nВыберите действие:", reply_markup=reply_markup)
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    if update.effective_user.id not in ADMIN_IDS:
+        return
+    
+    if query.data == 'main_menu':
+        await show_main_menu(update, context)
+    
+    elif query.data == 'messages_menu':
+        keyboard = [
+            [InlineKeyboardButton("📋 Список текстов", callback_data='show_messages_page_0')],
+            [InlineKeyboardButton("➕ Добавить текст", callback_data='add_message')],
+            [InlineKeyboardButton("◀️ Назад", callback_data='main_menu')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text("📝 Управление текстами\n\nВыберите действие:", reply_markup=reply_markup)
+    
+    elif query.data.startswith('show_messages_page_'):
+        page = int(query.data.split('_')[-1])
+        messages = load_messages()
+        
+        if not messages:
+            text = "📝 Текстов нет"
+            keyboard = [[InlineKeyboardButton("◀️ Назад", callback_data='messages_menu')]]
+        else:
+            per_page = 10
+            total_pages = (len(messages) + per_page - 1) // per_page
+            start = page * per_page
+            end = start + per_page
+            page_messages = messages[start:end]
+            
+            text = f"📝 Тексты (страница {page+1}/{total_pages})\nВсего: {len(messages)}\n\n"
+            
+            keyboard = []
+            for i, msg in enumerate(page_messages, start + 1):
+                preview = msg[:50].replace('\n', ' ') + "..." if len(msg) > 50 else msg.replace('\n', ' ')
+                keyboard.append([InlineKeyboardButton(f"{i}. {preview}", callback_data=f'view_message_{i}')])
+            
+            nav_row = []
+            if page > 0:
+                nav_row.append(InlineKeyboardButton("⬅️ Пред.", callback_data=f'show_messages_page_{page-1}'))
+            if len(messages) > end:
+                nav_row.append(InlineKeyboardButton("След. ➡️", callback_data=f'show_messages_page_{page+1}'))
+            if nav_row:
+                keyboard.append(nav_row)
+            
+            keyboard.append([InlineKeyboardButton("◀️ Назад", callback_data='messages_menu')])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+    
+    elif query.data.startswith('view_message_'):
+        msg_num = int(query.data.split('_')[-1])
+        messages = load_messages()
+        
+        if 1 <= msg_num <= len(messages):
+            msg = messages[msg_num - 1]
+            text = f" Текст #{msg_num}:\n\n{msg}"
+            
+            keyboard = [
+                [InlineKeyboardButton("✏️ Редактировать", callback_data=f'edit_message_{msg_num}')],
+                [InlineKeyboardButton("🗑️ Удалить", callback_data=f'delete_message_{msg_num}')],
+                [InlineKeyboardButton("◀️ К списку", callback_data='show_messages_page_0')]
+            ]
+        else:
+            text = "❌ Текст не найден"
+            keyboard = [[InlineKeyboardButton("◀️ Назад", callback_data='messages_menu')]]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+    
+    elif query.data.startswith('edit_message_'):
+        msg_num = int(query.data.split('_')[-1])
+        context.user_data['action'] = f'edit_message_{msg_num}'
+        
+        messages = load_messages()
+        if 1 <= msg_num <= len(messages):
+            msg = messages[msg_num - 1]
+            text = f"✏️ Редактирование текста #{msg_num}\n\nТекущий текст:\n{msg[:100]}...\n\nОтправьте новый текст:\n\n(Отмена: /cancel)"
+        else:
+            text = "❌ Текст не найден"
+        
+        keyboard = [[InlineKeyboardButton("◀️ Отмена", callback_data=f'view_message_{msg_num}')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+    
+    elif query.data.startswith('delete_message_'):
+        msg_num = int(query.data.split('_')[-1])
+        messages = load_messages()
+        
+        if 1 <= msg_num <= len(messages):
+            deleted = messages.pop(msg_num - 1)
+            save_messages(messages)
+            text = f"✅ Текст #{msg_num} удалён:\n\n{deleted[:100]}..."
+        else:
+            text = "❌ Текст не найден"
+        
+        keyboard = [[InlineKeyboardButton("◀️ К списку", callback_data='show_messages_page_0')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+    
+    elif query.data == 'add_message':
+        context.user_data['action'] = 'add_message'
+        text = " Отправьте текст сообщения:\n\n(Отмена: /cancel)"
+        keyboard = [[InlineKeyboardButton("◀️ Отмена", callback_data='messages_menu')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+    
+    elif query.data == 'settings_menu':
+        settings = load_settings()
+        text = f"⏱️ Текущие настройки:\n\n"
+        text += f"• Пауза между постами: {settings['post_interval']} сек\n"
+        text += f"• Интервал проверки: {settings['check_interval'] // 3600} ч\n"
+        text += f"• Время перед удалением: {settings['delete_delay']} мин\n\n"
+        text += "Что изменить?"
+        keyboard = [
+            [InlineKeyboardButton("Пауза между постами", callback_data='set_post_interval')],
+            [InlineKeyboardButton("Интервал проверки", callback_data='set_check_interval')],
+            [InlineKeyboardButton("Время перед удалением", callback_data='set_delete_delay')],
+            [InlineKeyboardButton("◀️ Назад", callback_data='main_menu')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+    
+    elif query.data == 'set_post_interval':
+        context.user_data['action'] = 'set_post_interval'
+        text = "⏱️ Введите паузу (сек):\n\n(Отмена: /cancel)"
+        keyboard = [[InlineKeyboardButton("◀️ Отмена", callback_data='settings_menu')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+    
+    elif query.data == 'set_check_interval':
+        context.user_data['action'] = 'set_check_interval'
+        text = "⏱️ Введите интервал (часов):\n\n(Отмена: /cancel)"
+        keyboard = [[InlineKeyboardButton("◀️ Отмена", callback_data='settings_menu')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+    
+    elif query.data == 'set_delete_delay':
+        context.user_data['action'] = 'set_delete_delay'
+        text = "⏱️ Введите время (мин):\n\n(Отмена: /cancel)"
+        keyboard = [[InlineKeyboardButton("◀️ Отмена", callback_data='settings_menu')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+    
+    elif query.data == 'groups_menu':
+        groups = load_groups()
+        if not groups:
+            text = "📋 Групп нет"
+            keyboard = [[InlineKeyboardButton("️ Назад", callback_data='main_menu')]]
+        else:
+            per_page = 15
+            page = 0
+            start = page * per_page
+            end = start + per_page
+            page_groups = groups[start:end]
+            total_pages = (len(groups) + per_page - 1) // per_page
+            
+            text = f"📋 Группы ({page+1}/{total_pages})\nВсего: {len(groups)}\n\n"
+            keyboard = []
+            for i, g in enumerate(page_groups, start + 1):
+                link = f"https://vk.com/club{abs(g)}"
+                keyboard.append([InlineKeyboardButton(f"{i}. {g}", url=link)])
+            
+            nav_row = []
+            if page > 0:
+                nav_row.append(InlineKeyboardButton("️", callback_data=f'groups_page_{page-1}'))
+            if len(groups) > end:
+                nav_row.append(InlineKeyboardButton("➡️", callback_data=f'groups_page_{page+1}'))
+            if nav_row:
+                keyboard.append(nav_row)
+            keyboard.append([InlineKeyboardButton("◀️ Назад", callback_data='main_menu')])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+    
+    elif query.data.startswith('groups_page_'):
+        page = int(query.data.split('_')[-1])
+        groups = load_groups()
+        
+        if not groups:
+            text = "📋 Групп нет"
+            keyboard = [[InlineKeyboardButton("️ Назад", callback_data='main_menu')]]
+        else:
+            per_page = 15
+            start = page * per_page
+            end = start + per_page
+            page_groups = groups[start:end]
+            total_pages = (len(groups) + per_page - 1) // per_page
+            
+            text = f"📋 Группы ({page+1}/{total_pages})\nВсего: {len(groups)}\n\n"
+            keyboard = []
+            for i, g in enumerate(page_groups, start + 1):
+                link = f"https://vk.com/club{abs(g)}"
+                keyboard.append([InlineKeyboardButton(f"{i}. {g}", url=link)])
+            
+            nav_row = []
+            if page > 0:
+                nav_row.append(InlineKeyboardButton("⬅️", callback_data=f'groups_page_{page-1}'))
+            if len(groups) > end:
+                nav_row.append(InlineKeyboardButton("➡️", callback_data=f'groups_page_{page+1}'))
+            if nav_row:
+                keyboard.append(nav_row)
+            keyboard.append([InlineKeyboardButton("️ Назад", callback_data='main_menu')])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+    
+    elif query.data == 'stats':
+        stats = load_stats()
+        success = stats.get('success', 0)
+        errors = stats.get('errors', [])
+        text = f"📊 Статистика:\n\n✅ Успешных постов: {success}\n❌ Ошибок: {len(errors)}\n\n"
+        if errors:
+            text += "Последние ошибки:\n"
+            for err in errors[-5:]:
+                text += f"• Группа {err['group']}: {err['error'][:50]}\n"
+        keyboard = [[InlineKeyboardButton("◀️ Назад", callback_data='main_menu')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+    
+    elif query.data == 'accounts':
+        await show_accounts_menu(query)
+
+    # STABLE IDENTITY V2
+    elif query.data.startswith(
+        "account_view_uid_"
+    ):
+        raw_user_id = query.data.rsplit("_", 1)[-1]
+
+        user_id = _normalize_vk_user_id(raw_user_id)
+
+        if user_id is None:
+            await show_accounts_menu(query)
+        else:
+            await show_account_card(query, user_id)
+
+    elif query.data.startswith(
+        "account_disable_uid_"
+    ):
+        raw_user_id = query.data.rsplit("_", 1)[-1]
+        user_id = _normalize_vk_user_id(raw_user_id)
+
+        if user_id is None:
+            await show_accounts_menu(query)
+        else:
+            result = tx_disable_vk_account(user_id)
+
+            status = result.get("status")
+
+            if status == "not_found":
+                await show_accounts_menu(query)
+            else:
+                await show_account_card(query, user_id)
+
+    elif query.data.startswith(
+        "account_enable_ask_uid_"
+    ):
+        raw_user_id = query.data.rsplit("_", 1)[-1]
+        user_id = _normalize_vk_user_id(raw_user_id)
+
+        if user_id is None:
+            await show_accounts_menu(query)
+        else:
+            accounts = get_vk_accounts()
+
+            index = _find_account_index_by_user_id(
+                accounts,
+                user_id,
+            )
+
+            if index is None:
+                await show_accounts_menu(query)
+            else:
+                account = accounts[index]
+
+                ready, errors = (
+                    validate_account_for_enable(account)
+                )
+
+                if not ready:
+                    error_text = "\n".join(
+                        f"• {error}"
+                        for error in errors
+                    )
+
+                    await query.edit_message_text(
+                        "⚠️ Аккаунт нельзя включить.\n\n"
+                        f"ID: {user_id}\n\n"
+                        f"{error_text}",
+                        reply_markup=InlineKeyboardMarkup(
+                            [[
+                                InlineKeyboardButton(
+                                    "◀️ Назад",
+                                    callback_data=(
+                                        f"account_view_uid_"
+                                        f"{user_id}"
+                                    ),
+                                )
+                            ]]
+                        ),
+                    )
+                else:
+                    await query.edit_message_text(
+                        "▶️ Включить VK-аккаунт?\n\n"
+                        f"ID: {user_id}\n\n"
+                        "После включения основной бот "
+                        "сможет использовать этот аккаунт.",
+                        reply_markup=InlineKeyboardMarkup(
+                            [
+                                [
+                                    InlineKeyboardButton(
+                                        "✅ Включить",
+                                        callback_data=(
+                                            f"account_enable_"
+                                            f"confirm_uid_{user_id}"
+                                        ),
+                                    )
+                                ],
+                                [
+                                    InlineKeyboardButton(
+                                        "◀️ Отмена",
+                                        callback_data=(
+                                            f"account_view_uid_"
+                                            f"{user_id}"
+                                        ),
+                                    )
+                                ],
+                            ]
+                        ),
+                    )
+
+    elif query.data.startswith(
+        "account_enable_confirm_uid_"
+    ):
+        raw_user_id = query.data.rsplit("_", 1)[-1]
+        user_id = _normalize_vk_user_id(raw_user_id)
+
+        if user_id is None:
+            await show_accounts_menu(query)
+        else:
+            result = tx_set_vk_account_enabled(
+                user_id,
+                True,
+            )
+
+            status = result.get("status")
+
+            if status == "not_found":
+                await show_accounts_menu(query)
+
+            elif status == "not_ready":
+                errors = result.get("errors") or []
+
+                error_text = "\n".join(
+                    f"• {error}"
+                    for error in errors
+                )
+
+                await query.edit_message_text(
+                    "⚠️ Аккаунт не включён.\n\n"
+                    f"ID: {user_id}\n\n"
+                    f"{error_text}",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[
+                            InlineKeyboardButton(
+                                "◀️ Назад",
+                                callback_data=(
+                                    f"account_view_uid_"
+                                    f"{user_id}"
+                                ),
+                            )
+                        ]]
+                    ),
+                )
+            else:
+                await show_account_card(
+                    query,
+                    user_id,
+                )
+
+    elif query.data.startswith(
+        "account_delete_ask_uid_"
+    ):
+        raw_user_id = query.data.rsplit("_", 1)[-1]
+        user_id = _normalize_vk_user_id(raw_user_id)
+
+        if user_id is None:
+            await show_accounts_menu(query)
+        else:
+            accounts = get_vk_accounts()
+
+            index = _find_account_index_by_user_id(
+                accounts,
+                user_id,
+            )
+
+            if index is None:
+                await show_accounts_menu(query)
+            else:
+                account = accounts[index]
+                enabled = (
+                    account.get("enabled") is True
+                )
+
+                if enabled:
+                    warning = (
+                        "\n\n⚠️ Аккаунт сейчас включён. "
+                        "Первое подтверждение только "
+                        "выключит его. Для физического "
+                        "удаления потребуется открыть "
+                        "аккаунт и подтвердить удаление "
+                        "ещё раз."
+                    )
+                else:
+                    warning = ""
+
+                await query.edit_message_text(
+                    "🗑 Удалить VK-аккаунт?\n\n"
+                    f"ID: {user_id}"
+                    f"{warning}",
+                    reply_markup=InlineKeyboardMarkup(
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "🗑 Подтвердить",
+                                    callback_data=(
+                                        f"account_delete_"
+                                        f"confirm_uid_{user_id}"
+                                    ),
+                                )
+                            ],
+                            [
+                                InlineKeyboardButton(
+                                    "◀️ Отмена",
+                                    callback_data=(
+                                        f"account_view_uid_"
+                                        f"{user_id}"
+                                    ),
+                                )
+                            ],
+                        ]
+                    ),
+                )
+
+    elif query.data.startswith(
+        "account_delete_confirm_uid_"
+    ):
+        raw_user_id = query.data.rsplit("_", 1)[-1]
+        user_id = _normalize_vk_user_id(raw_user_id)
+
+        if user_id is None:
+            await show_accounts_menu(query)
+        else:
+            result = tx_delete_vk_account(user_id)
+            status = result.get("status")
+
+            if status == "disabled_first":
+                await query.edit_message_text(
+                    "⏸ Аккаунт выключен.\n\n"
+                    f"ID: {user_id}\n\n"
+                    "Физическое удаление не выполнено. "
+                    "Откройте аккаунт снова и удалите "
+                    "его отдельным действием.",
+                    reply_markup=InlineKeyboardMarkup(
+                        [
+                            [
+                                InlineKeyboardButton(
+                                    "👤 Открыть аккаунт",
+                                    callback_data=(
+                                        f"account_view_uid_"
+                                        f"{user_id}"
+                                    ),
+                                )
+                            ],
+                            [
+                                InlineKeyboardButton(
+                                    "◀️ К аккаунтам",
+                                    callback_data="accounts",
+                                )
+                            ],
+                        ]
+                    ),
+                )
+
+            elif status == "pending_posts":
+                pending = result.get(
+                    "pending_posts",
+                    0,
+                )
+
+                await query.edit_message_text(
+                    "⚠️ Аккаунт не удалён.\n\n"
+                    f"ID: {user_id}\n"
+                    f"Незавершённых постов: {pending}",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[
+                            InlineKeyboardButton(
+                                "◀️ Назад",
+                                callback_data=(
+                                    f"account_view_uid_"
+                                    f"{user_id}"
+                                ),
+                            )
+                        ]]
+                    ),
+                )
+
+            elif status == "queue_error":
+                await query.edit_message_text(
+                    "⚠️ Аккаунт не удалён.\n\n"
+                    "Не удалось безопасно проверить "
+                    "очередь публикаций.",
+                    reply_markup=InlineKeyboardMarkup(
+                        [[
+                            InlineKeyboardButton(
+                                "◀️ Назад",
+                                callback_data=(
+                                    f"account_view_uid_"
+                                    f"{user_id}"
+                                ),
+                            )
+                        ]]
+                    ),
+                )
+
+            elif status in {
+                "deleted",
+                "not_found",
+            }:
+                await show_accounts_menu(query)
+
+            else:
+                await show_account_card(
+                    query,
+                    user_id,
+                )
+
+    # LEGACY INDEX CALLBACKS — READ ONLY / EXPIRED.
+    # They MUST be below all UID branches.
+    elif (
+        query.data.startswith("account_view_")
+        or query.data.startswith("account_disable_")
+        or query.data.startswith("account_enable_ask_")
+        or query.data.startswith("account_delete_ask_")
+        or query.data.startswith("account_enable_confirm_")
+        or query.data.startswith("account_delete_confirm_")
+    ):
+        await query.edit_message_text(
+            "⚠️ Эта кнопка устарела.\n\n"
+            "Список аккаунтов был обновлён. "
+            "Откройте его заново.",
+            reply_markup=InlineKeyboardMarkup(
+                [[
+                    InlineKeyboardButton(
+                        "👥 К аккаунтам",
+                        callback_data="accounts",
+                    )
+                ]]
+            ),
+        )
+
+    elif query.data == 'account_add':
+        # SAFE ACCOUNT WIZARD V1
+        # Черновик хранится только в context.user_data.
+        # config.json здесь НЕ изменяется.
+        context.user_data.pop(
+            'vk_account_draft',
+            None,
+        )
+        
+        context.user_data[
+            'vk_account_draft'
+        ] = {}
+        
+        context.user_data[
+            'action'
+        ] = 'account_add_user_id'
+        
+        text = (
+            "➕ Новый VK-аккаунт — шаг 1/2\n\n"
+            "Отправьте числовой VK ID аккаунта.\n\n"
+            "Пример: 123456789\n\n"
+            "⚠️ Создаётся только временный "
+            "черновик.\n"
+            "config.json не изменяется.\n"
+            "VK API не вызывается."
+        )
+        
+        keyboard = [[
+            InlineKeyboardButton(
+                "❌ Отмена",
+                callback_data='account_add_cancel',
+            )
+        ]]
+        
+        await query.message.edit_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(
+                keyboard
+            ),
+        )
+    elif query.data == 'account_add_cancel':
+        context.user_data.pop(
+            'vk_account_draft',
+            None,
+        )
+
+        context.user_data.pop(
+            'action',
+            None,
+        )
+
+        text = (
+            "❌ Добавление отменено.\n\n"
+            "Черновик удалён.\n"
+            "Рабочая конфигурация не изменялась."
+        )
+
+        keyboard = [[
+            InlineKeyboardButton(
+                "◀️ К аккаунтам",
+                callback_data='accounts',
+            )
+        ]]
+
+        await query.message.edit_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(
+                keyboard
+            ),
+        )
+
+    elif query.data == 'account_add_save':
+        # SAFE SAVE V1.1
+        # Transactional.
+        # Always disabled.
+        # Token always empty.
+        # No VK API.
+        draft = context.user_data.get(
+            'vk_account_draft'
+        )
+
+        if not isinstance(draft, dict):
+            await query.message.edit_text(
+                "❌ Черновик не найден.\n\n"
+                "Ничего не сохранено.",
+                reply_markup=InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton(
+                            "👥 К аккаунтам",
+                            callback_data='accounts',
+                        )
+                    ]
+                ]),
+            )
+            return
+
+        user_id = draft.get('user_id')
+        phone = draft.get('phone')
+
+        try:
+            result = (
+                tx_add_vk_account_disabled(
+                    user_id,
+                    phone,
+                )
+            )
+        except Exception:
+            await query.message.edit_text(
+                "❌ Ошибка безопасного "
+                "сохранения.\n\n"
+                "Аккаунт НЕ сохранён "
+                "и НЕ активирован."
+            )
+            return
+
+        status = result.get('status')
+
+        if status == 'saved':
+            saved_user_id = result.get(
+                'user_id'
+            )
+
+            context.user_data.pop(
+                'vk_account_draft',
+                None,
+            )
+            context.user_data.pop(
+                'action',
+                None,
+            )
+
+            text = (
+                "✅ VK-аккаунт сохранён.\n\n"
+                f"🆔 VK ID: {saved_user_id}\n"
+                f"📞 Телефон: "
+                f"{str(phone).strip()}\n"
+                "⏸️ Статус: ОТКЛЮЧЁН\n"
+                "🔐 Токен: НЕ УСТАНОВЛЕН\n\n"
+                "Основной бот НЕ может "
+                "использовать этот аккаунт.\n"
+                "VK API не вызывался."
+            )
+
+        elif status == 'duplicate':
+            text = (
+                "❌ Аккаунт с таким VK ID "
+                "уже существует.\n\n"
+                "Дубликат НЕ создан.\n"
+                "Черновик сохранён."
+            )
+
+        elif status == 'bad_user_id':
+            text = (
+                "❌ Некорректный VK ID.\n\n"
+                "Аккаунт НЕ сохранён."
+            )
+
+        elif status == 'bad_phone':
+            text = (
+                "❌ Некорректный телефон.\n\n"
+                "Аккаунт НЕ сохранён."
+            )
+
+        else:
+            text = (
+                "❌ Аккаунт НЕ сохранён.\n\n"
+                "Неизвестный результат "
+                "транзакции."
+            )
+
+        await query.message.edit_text(
+            text,
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(
+                        "👥 К аккаунтам",
+                        callback_data='accounts',
+                    )
+                ]
+            ]),
+        )
+
+    elif query.data == 'account_add_discard':
+        context.user_data.pop(
+            'vk_account_draft',
+            None,
+        )
+
+        context.user_data.pop(
+            'action',
+            None,
+        )
+
+        text = (
+            "🗑 Черновик удалён.\n\n"
+            "Данные не записывались "
+            "в config.json."
+        )
+
+        keyboard = [[
+            InlineKeyboardButton(
+                "◀️ К аккаунтам",
+                callback_data='accounts',
+            )
+        ]]
+
+        await query.message.edit_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(
+                keyboard
+            ),
+        )
+
+    
+    elif query.data in (
+        'vk_worker',
+        'vk_worker_status',
+    ):
+        await show_vk_worker_menu(
+            query
+        )
+
+    elif query.data == 'vk_worker_scan_start':
+        try:
+            payload = vk_worker_write_command(
+                "SCAN_START",
+                admin_id=query.from_user.id,
+            )
+
+            text = (
+                "▶️ Команда запуска SCAN отправлена.\n\n"
+                f"ID: {payload['id']}\n"
+                "Windows Bridge заберёт её "
+                "при следующей проверке.\n\n"
+                "🔒 Production остаётся "
+                "ЗАБЛОКИРОВАН."
+            )
+
+        except Exception as exc:
+            text = (
+                "❌ Не удалось создать "
+                "команду SCAN_START.\n\n"
+                f"Ошибка: {type(exc).__name__}"
+            )
+
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "🔄 Проверить статус",
+                    callback_data="vk_worker_status",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "◀️ VK Worker",
+                    callback_data="vk_worker",
+                )
+            ],
+        ]
+
+        await query.message.edit_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(
+                keyboard
+            ),
+        )
+
+    elif query.data == 'vk_worker_scan_stop':
+        try:
+            payload = vk_worker_write_command(
+                "SCAN_STOP",
+                admin_id=query.from_user.id,
+            )
+
+            text = (
+                "⏹ Команда остановки SCAN отправлена.\n\n"
+                f"ID: {payload['id']}\n"
+                "Windows Bridge заберёт её "
+                "при следующей проверке.\n\n"
+                "🔒 Production остаётся "
+                "ЗАБЛОКИРОВАН."
+            )
+
+        except Exception as exc:
+            text = (
+                "❌ Не удалось создать "
+                "команду SCAN_STOP.\n\n"
+                f"Ошибка: {type(exc).__name__}"
+            )
+
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "🔄 Проверить статус",
+                    callback_data="vk_worker_status",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "◀️ VK Worker",
+                    callback_data="vk_worker",
+                )
+            ],
+        ]
+
+        await query.message.edit_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(
+                keyboard
+            ),
+        )
+
+    elif query.data == 'vk_worker_log':
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "🔄 Обновить лог",
+                    callback_data=(
+                        "vk_worker_log"
+                    ),
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "◀️ VK Worker",
+                    callback_data=(
+                        "vk_worker"
+                    ),
+                )
+            ],
+        ]
+
+        await query.message.edit_text(
+            vk_worker_log_text(),
+            reply_markup=InlineKeyboardMarkup(
+                keyboard
+            ),
+        )
+
+    elif query.data == 'logs':
+        try:
+            with open('logs/bot.log', 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                last_lines = lines[-20:] if len(lines) >= 20 else lines
+                log_text = ''.join(last_lines)
+            text = f" Последние 20 строк:\n\n<pre>{log_text}</pre>"
+        except:
+            text = "Логов пока нет"
+        keyboard = [[InlineKeyboardButton("◀️ Назад", callback_data='main_menu')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, parse_mode='HTML', reply_markup=reply_markup)
+    
+    elif query.data == 'pause':
+        if not os.path.exists('pause.flag'):
+            open('pause.flag', 'w').close()
+            text = "⏸️ Бот на паузе"
+        else:
+            text = "⏸️ Уже на паузе"
+        keyboard = [[InlineKeyboardButton("️ Назад", callback_data='main_menu')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+    
+    elif query.data == 'resume':
+        if os.path.exists('pause.flag'):
+            os.remove('pause.flag')
+            text = "▶️ Бот возобновил работу"
+        else:
+            text = "▶️ Уже работает"
+        keyboard = [[InlineKeyboardButton("◀️ Назад", callback_data='main_menu')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+    
+    elif query.data == 'restart':
+        text = "🔄 Как перезапустить:\n\n1. Остановить: Ctrl+C\n2. Запустить: python3 bot.py"
+        keyboard = [[InlineKeyboardButton("◀️ Назад", callback_data='main_menu')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.message.edit_text(text, reply_markup=reply_markup)
+
+async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS:
+        return
+    
+    action = context.user_data.get('action')
+
+    # =====================================================
+    # SAFE VK ACCOUNT WIZARD V1
+    # =====================================================
+
+    if action == 'account_add_user_id':
+        raw_user_id = update.message.text.strip()
+
+        try:
+            user_id = int(raw_user_id)
+        except (TypeError, ValueError):
+            await update.message.reply_text(
+                "❌ VK ID должен состоять "
+                "только из цифр."
+            )
+            return
+
+        if user_id <= 0:
+            await update.message.reply_text(
+                "❌ VK ID должен быть "
+                "положительным числом."
+            )
+            return
+
+        try:
+            cfg = load_config_fresh()
+            accounts = cfg.get(
+                'vk_accounts',
+                [],
+            )
+        except Exception:
+            await update.message.reply_text(
+                "❌ Не удалось безопасно "
+                "прочитать config.json.\n"
+                "Добавление остановлено."
+            )
+            return
+
+        duplicate = any(
+            isinstance(account, dict)
+            and str(
+                account.get('user_id')
+            ) == str(user_id)
+            for account in accounts
+        )
+
+        if duplicate:
+            context.user_data.pop(
+                'vk_account_draft',
+                None,
+            )
+            context.user_data.pop(
+                'action',
+                None,
+            )
+
+            await update.message.reply_text(
+                "❌ Такой VK ID уже есть "
+                "в рабочей конфигурации.\n"
+                "Черновик удалён."
+            )
+            return
+
+        draft = context.user_data.setdefault(
+            'vk_account_draft',
+            {},
+        )
+
+        draft['user_id'] = user_id
+
+        context.user_data[
+            'action'
+        ] = 'account_add_phone'
+
+        await update.message.reply_text(
+            "➕ Новый VK-аккаунт — шаг 2/2\n\n"
+            f"VK ID: {user_id}\n\n"
+            "Теперь отправьте телефон, "
+            "который будет использоваться "
+            "в объявлении.\n\n"
+            "Пароль VK и токен "
+            "НЕ отправляйте."
+        )
+        return
+
+    if action == 'account_add_phone':
+        phone = update.message.text.strip()
+
+        if not phone:
+            await update.message.reply_text(
+                "❌ Телефон не может быть пустым."
+            )
+            return
+
+        if len(phone) > 40:
+            await update.message.reply_text(
+                "❌ Слишком длинное значение.\n"
+                "Введите только телефон."
+            )
+            return
+
+        draft = context.user_data.get(
+            'vk_account_draft',
+        )
+
+        if not isinstance(draft, dict):
+            context.user_data.pop(
+                'action',
+                None,
+            )
+
+            await update.message.reply_text(
+                "❌ Черновик потерян.\n"
+                "Начните добавление заново."
+            )
+            return
+
+        user_id = draft.get('user_id')
+
+        if user_id is None:
+            context.user_data.pop(
+                'vk_account_draft',
+                None,
+            )
+            context.user_data.pop(
+                'action',
+                None,
+            )
+
+            await update.message.reply_text(
+                "❌ В черновике отсутствует VK ID.\n"
+                "Начните добавление заново."
+            )
+            return
+
+        draft['phone'] = phone
+
+        context.user_data.pop(
+            'action',
+            None,
+        )
+
+        text = (
+            "📋 Черновик VK-аккаунта готов\n\n"
+            f"🆔 VK ID: {user_id}\n"
+            f"📞 Телефон: {phone}\n"
+            "⏸️ Статус: НЕ СОХРАНЁН\n"
+            "🔐 Авторизация VK: "
+            "НЕ ПОДКЛЮЧЕНА\n\n"
+            "Черновик находится только "
+            "во временной памяти админки.\n"
+            "config.json не изменён.\n"
+            "VK API не вызывался."
+        )
+
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "💾 Сохранить отключённым",
+                    callback_data='account_add_save',
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "🗑 Удалить черновик",
+                    callback_data='account_add_discard',
+                ),
+                InlineKeyboardButton(
+                    "👥 К аккаунтам",
+                    callback_data='accounts',
+                ),
+            ],
+        ]
+
+        await update.message.reply_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(
+                keyboard
+            ),
+        )
+        return
+
+    
+    if action == 'add_message':
+        text = update.message.text
+        messages = load_messages()
+        messages.append(text)
+        save_messages(messages)
+        await update.message.reply_text(f"✅ Текст добавлен!\n\nВсего: {len(messages)}")
+        context.user_data['action'] = None
+    
+    elif action and action.startswith('edit_message_'):
+        msg_num = int(action.split('_')[-1])
+        new_text = update.message.text
+        messages = load_messages()
+        
+        if 1 <= msg_num <= len(messages):
+            messages[msg_num - 1] = new_text
+            save_messages(messages)
+            await update.message.reply_text(f"✅ Текст #{msg_num} обновлён!")
+        else:
+            await update.message.reply_text("❌ Текст не найден")
+        
+        context.user_data['action'] = None
+    
+    elif action == 'set_post_interval':
+        try:
+            seconds = int(update.message.text)
+            settings = load_settings()
+            settings['post_interval'] = seconds
+            save_settings(settings)
+            await update.message.reply_text(f"✅ Пауза: {seconds} сек")
+        except:
+            await update.message.reply_text("❌ Введите число")
+        context.user_data['action'] = None
+    
+    elif action == 'set_check_interval':
+        try:
+            hours = int(update.message.text)
+            settings = load_settings()
+            settings['check_interval'] = hours * 3600
+            save_settings(settings)
+            await update.message.reply_text(f"✅ Интервал: {hours} ч")
+        except:
+            await update.message.reply_text("❌ Введите число")
+        context.user_data['action'] = None
+    
+    elif action == 'set_delete_delay':
+        try:
+            minutes = int(update.message.text)
+            settings = load_settings()
+            settings['delete_delay'] = minutes
+            save_settings(settings)
+            await update.message.reply_text(f"✅ Время удаления: {minutes} мин")
+        except:
+            await update.message.reply_text("❌ Введите число")
+        context.user_data['action'] = None
+
+def main():
+    print("Telegram админка запущена")
+    print(f"Администраторы: {ADMIN_IDS}")
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler('start', start))
+    app.add_handler(CommandHandler('cancel', lambda u, c: show_main_menu(u, c)))
+    app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+    app.run_polling()
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,316 @@
+from pathlib import Path
+import sqlite3
+import subprocess
+import sys
+import time
+
+from playwright.sync_api import (
+    sync_playwright,
+)
+
+BASE = Path("/opt/vkbot")
+
+DB = BASE / "vk_multi_account.sqlite3"
+
+CHROME = (
+    "/root/.cache/ms-playwright/"
+    "chromium-1243/chrome-linux64/chrome"
+)
+
+
+def get_account(account_id):
+    con = sqlite3.connect(DB)
+
+    con.row_factory = sqlite3.Row
+
+    row = con.execute(
+        """
+        SELECT *
+        FROM accounts
+        WHERE id=?
+        """,
+        (account_id,),
+    ).fetchone()
+
+    con.close()
+
+    return row
+
+
+def set_auth(account_id, status):
+    con = sqlite3.connect(DB)
+
+    con.execute(
+        """
+        UPDATE accounts
+        SET auth_status=?,
+            status=?,
+            updated_at=datetime('now')
+        WHERE id=?
+        """,
+        (
+            status,
+            (
+                "READY"
+                if status == "AUTHORIZED"
+                else "AUTH_REQUIRED"
+            ),
+            account_id,
+        ),
+    )
+
+    con.commit()
+    con.close()
+
+
+
+def verified_self_id(page):
+    """Verify VK ID through logged-in session's own Profile navigation."""
+    import re
+    from urllib.parse import urlparse
+
+    allowed = {'vk.ru', 'www.vk.ru', 'vk.com', 'www.vk.com'}
+    if any(x in (page.url or '').lower() for x in ('login', 'id.vk.com', 'challenge', 'captcha')):
+        return None
+
+    try:
+        # VK sidebar is hydrated asynchronously; an early DOM query returns zero.
+        profile_link = page.get_by_text('Профиль', exact=True)
+        profile_link.first.wait_for(state='visible', timeout=60000)
+        if profile_link.count() != 1:
+            print('IDENTITY: profile navigation ambiguous:', profile_link.count(), flush=True)
+            return None
+        profile_link.first.click(timeout=15000)
+        page.wait_for_url(re.compile(r'^https://(?:www\.)?vk\.(?:ru|com)/id[1-9][0-9]*/?(?:[?#].*)?$'), timeout=30000)
+        parsed = urlparse(page.url)
+        if parsed.hostname not in allowed:
+            return None
+        match = re.fullmatch(r'/id([1-9][0-9]*)/?', parsed.path)
+        if not match:
+            print('IDENTITY: profile numeric ID missing', flush=True)
+            return None
+        owner_control = page.get_by_text('Редактировать профиль', exact=True)
+        owner_control.first.wait_for(state='visible', timeout=30000)
+        if owner_control.count() != 1:
+            print('IDENTITY: edit control ambiguous', flush=True)
+            return None
+        vk_id = int(match.group(1))
+        print('IDENTITY: own profile confirmed', vk_id, flush=True)
+        return vk_id
+    except Exception as exc:
+        print('IDENTITY: verification failed:', type(exc).__name__, flush=True)
+        return None
+
+
+def confirm_identity(account_id, vk_id):
+    if not isinstance(vk_id, int) or vk_id <= 0:
+        return False
+    con = sqlite3.connect(DB, timeout=10)
+    try:
+        con.execute('BEGIN IMMEDIATE')
+        con.execute('CREATE TABLE IF NOT EXISTS account_verified_identity (account_id INTEGER PRIMARY KEY, vk_user_id INTEGER NOT NULL UNIQUE, verified_at TEXT NOT NULL)')
+        existing = con.execute('SELECT vk_user_id FROM account_verified_identity WHERE account_id=?', (account_id,)).fetchone()
+        other = con.execute('SELECT account_id FROM account_verified_identity WHERE vk_user_id=? AND account_id!=?', (vk_id, account_id)).fetchone()
+        if (existing and existing[0] != vk_id) or other:
+            con.rollback()
+            return False
+        con.execute('INSERT OR IGNORE INTO account_verified_identity(account_id,vk_user_id,verified_at) VALUES(?,?,datetime("now"))', (account_id, vk_id))
+        cur = con.execute('UPDATE accounts SET auth_status="AUTHORIZED", status="READY", updated_at=datetime("now") WHERE id=?', (account_id,))
+        if cur.rowcount != 1:
+            con.rollback()
+            return False
+        con.commit()
+        return True
+    finally:
+        con.close()
+
+from account_lifecycle_lock import account_lifecycle_exclusive
+
+def main():
+    if len(sys.argv) != 2:
+        raise SystemExit(
+            "Usage: "
+            "python vk_account_auth.py ID"
+        )
+
+    account_id = int(
+        sys.argv[1]
+    )
+
+    account = get_account(
+        account_id
+    )
+
+    if not account:
+        raise SystemExit(
+            "ACCOUNT_NOT_FOUND"
+        )
+
+    profile = Path(
+        account["profile_dir"]
+    )
+
+    profile.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    print(
+        "ACCOUNT:",
+        account["name"],
+    )
+
+    print(
+        "PROFILE:",
+        profile,
+    )
+
+    print(
+        "Opening VK..."
+    )
+
+    with sync_playwright() as p, account_lifecycle_exclusive(account_id):
+        ctx = (
+            p.chromium
+            .launch_persistent_context(
+                user_data_dir=str(
+                    profile
+                ),
+                executable_path=CHROME,
+                headless=False,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                ],
+                viewport=None,
+                timeout=120000,
+            )
+        )
+
+        page = (
+            ctx.pages[0]
+            if ctx.pages
+            else ctx.new_page()
+        )
+
+        page.goto(
+            "https://vk.ru/feed",
+            wait_until="domcontentloaded",
+            timeout=120000,
+        )
+
+        print()
+        print(
+            "Complete login in VNC."
+        )
+
+        print(
+            "When VK feed is visible, "
+            "return here and press ENTER."
+        )
+
+        print()
+        print("Complete login in VNC.")
+        print("Authorization will be detected automatically.")
+
+        print("Waiting for VK authorization...", flush=True)
+
+        deadline = time.time() + 900
+        authorized = False
+
+        while time.time() < deadline:
+            try:
+                page.wait_for_timeout(2000)
+
+                url = (page.url or "").lower()
+                title = (page.title() or "").lower()
+
+                body = ""
+                try:
+                    body = (
+                        page.locator("body")
+                        .inner_text(timeout=3000)
+                        .lower()
+                    )
+                except Exception:
+                    pass
+
+                challenge = (
+                    "проверяем, что вы не робот" in body
+                    or "подтвердите вход" in body
+                    or "too many attempts" in body
+                    or "слишком много попыток" in body
+                    or "captcha" in url
+                    or "/challenge" in url
+                    or "blocked" in url
+                )
+
+                login_page = (
+                    "login" in url
+                    or "id.vk.com" in url
+                    or "войти" in title
+                    or "вход" in title
+                )
+
+                normal_vk = (
+                    (
+                        "vk.ru" in url
+                        or "vk.com" in url
+                    )
+                    and not login_page
+                    and not challenge
+                    and (
+                        "/feed" in url
+                        or "/im" in url
+                        or "/friends" in url
+                        or "/groups" in url
+                        or "/id" in url
+                        or "/club" in url
+                        or "/public" in url
+                    )
+                )
+
+                if normal_vk:
+                    authorized = True
+                    print(
+                        "VK PAGE DETECTED: identity not verified",
+                        flush=True,
+                    )
+                    break
+
+            except Exception as e:
+                print(
+                    "AUTH WAIT:",
+                    type(e).__name__,
+                    flush=True,
+                )
+
+        if not authorized:
+            print('AUTH NOT CONFIRMED', flush=True)
+            set_auth(account_id, 'AUTH_REQUIRED')
+            ctx.close()
+            return 20
+
+        # A feed page is not proof of identity. Require a dedicated
+        # self-profile link with a numeric VK ID. Fail closed otherwise.
+        deadline_identity = time.time() + 90
+        vk_id = None
+        while time.time() < deadline_identity:
+            vk_id = verified_self_id(page)
+            if vk_id:
+                break
+            page.wait_for_timeout(2000)
+
+        if vk_id is None or not confirm_identity(account_id, vk_id):
+            print('AUTH NOT VERIFIED: self VK ID missing or mismatch', flush=True)
+            set_auth(account_id, 'AUTH_REQUIRED')
+            ctx.close()
+            return 20
+
+        print('AUTHORIZED: verified self VK ID', vk_id, flush=True)
+        ctx.close()
+        return 0
+
+
+if __name__ == "__main__":
+    main()
