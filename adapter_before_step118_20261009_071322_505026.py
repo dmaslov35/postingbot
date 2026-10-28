@@ -1,0 +1,349 @@
+#!/opt/vkbot/venv/bin/python
+
+from pathlib import Path
+from datetime import datetime
+import json
+import os
+import sys
+import traceback
+
+BASE = Path("/opt/vkbot")
+RUNTIME = BASE / "runtime"
+
+# ============================================================
+# HARD LOCKS
+# ============================================================
+
+PRODUCTION_MASTER_UNLOCKED = True
+REAL_VK_ACTIONS_ENABLED = True
+
+# Only SUGGEST has passed the end-to-end test.
+SUGGEST_ENABLED = True
+
+# CREATE remains forbidden in production.
+CREATE_ENABLED = False
+
+# Membership mutations remain disabled.
+SUBSCRIBE_ENABLED = False
+JOIN_ENABLED = False
+
+
+def env_bool(name):
+    return os.environ.get(name, "0").strip().lower() in {
+        "1", "true", "yes", "on"
+    }
+
+
+def log(message):
+    line = f"[{datetime.now():%Y-%m-%d %H:%M:%S}] ADAPTER {message}"
+    print(line, flush=True)
+
+    with (BASE / "vk_queue_adapter.log").open(
+        "a",
+        encoding="utf-8",
+    ) as f:
+        f.write(line + "\n")
+
+
+def atomic_json(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    tmp = path.with_suffix(path.suffix + ".tmp")
+
+    tmp.write_text(
+        json.dumps(
+            data,
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    tmp.replace(path)
+
+
+def required_env(name):
+    value = os.environ.get(name, "").strip()
+
+    if not value:
+        raise RuntimeError(f"MISSING_ENV:{name}")
+
+    return value
+
+
+def assert_safety():
+    if not PRODUCTION_MASTER_UNLOCKED:
+        raise RuntimeError("ADAPTER_MASTER_LOCKED")
+
+    if not REAL_VK_ACTIONS_ENABLED:
+        raise RuntimeError("ADAPTER_REAL_ACTIONS_DISABLED")
+
+    if not SUGGEST_ENABLED:
+        raise RuntimeError("ADAPTER_SUGGEST_DISABLED")
+
+    if CREATE_ENABLED:
+        raise RuntimeError(
+            "CREATE_PRODUCTION_NOT_APPROVED"
+        )
+
+    if SUBSCRIBE_ENABLED:
+        raise RuntimeError(
+            "SUBSCRIBE_NOT_APPROVED"
+        )
+
+    if JOIN_ENABLED:
+        raise RuntimeError(
+            "JOIN_NOT_APPROVED"
+        )
+
+
+def result_from_record(record):
+    status = record.get("status") or "FAILED"
+    flow = record.get("flow")
+    message = record.get("message")
+
+    if status in {
+        "CONFIRMED",
+        "PROBABLE",
+        "REMOTE_ATTEMPTED",
+        "UNCERTAIN",
+    }:
+        capability = flow or "SUGGEST"
+
+    elif status in {
+        "SUGGEST_DISABLED",
+        "CREATE_READY_NOT_SUBMITTED",
+    }:
+        capability = (
+            "CREATE"
+            if status.startswith("CREATE")
+            else "SUGGEST"
+        )
+
+    else:
+        capability = None
+
+    return {
+        "status": status,
+        "flow": flow,
+        "message": message,
+        "capability": capability,
+        "subscription": record.get("subscription"),
+        "error": record.get("error"),
+        "reason": record.get("reason"),
+        "post_candidates": record.get("post_candidates", []),
+        "updated_at": record.get("updated_at"),
+    }
+
+
+def main():
+    RUNTIME.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    queue_id = required_env("VKBOT_QUEUE_ID")
+    account_id = required_env("VKBOT_ACCOUNT_ID")
+    account_code = required_env("VKBOT_ACCOUNT_CODE")
+    profile = Path(required_env("VKBOT_PROFILE"))
+    group_url = required_env("VKBOT_SINGLE_GROUP")
+
+    requested_flow = os.environ.get(
+        "VKBOT_REQUESTED_FLOW",
+        "AUTO",
+    ).upper()
+
+    result_file = (
+        RUNTIME / f"queue_{queue_id}.json"
+    )
+
+    group_file = (
+        RUNTIME / f"queue_{queue_id}_groups.txt"
+    )
+
+    state_file = (
+        RUNTIME / f"queue_{queue_id}_state.json"
+    )
+
+    worker_log = (
+        RUNTIME / f"queue_{queue_id}_worker.log"
+    )
+
+    for path in (
+        result_file,
+        group_file,
+        state_file,
+    ):
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+
+    log(
+        f"queue={queue_id} "
+        f"account={account_code} "
+        f"group={group_url} "
+        f"flow={requested_flow}"
+    )
+
+    # --------------------------------------------------------
+    # Nothing below may open VK until all locks pass.
+    # --------------------------------------------------------
+
+    assert_safety()
+
+    import vk_multi_account as multi
+
+    multi.assert_global_safety()
+
+    if requested_flow not in {
+        "AUTO",
+        "SUGGEST",
+    }:
+        atomic_json(
+            result_file,
+            {
+                "status": "FLOW_NOT_AVAILABLE",
+                "flow": requested_flow,
+                "message": None,
+                "capability": None,
+                "subscription": None,
+                "error": (
+                    "Only SUGGEST is approved "
+                    "for production queue"
+                ),
+            },
+        )
+        return 0
+
+    if not profile.exists():
+        raise RuntimeError(
+            f"PROFILE_NOT_FOUND:{profile}"
+        )
+
+    group_file.write_text(
+        group_url + "\n",
+        encoding="utf-8",
+    )
+
+    import vk_worker_production as worker
+
+    # --------------------------------------------------------
+    # Per-job isolation.
+    # --------------------------------------------------------
+
+    worker.PROFILE = profile
+    worker.GROUPS_FILE = group_file
+    worker.STATE_FILE = state_file
+    worker.LOG_FILE = worker_log
+
+    worker.MODE = "PRODUCTION"
+
+    worker.PRODUCTION_MASTER_UNLOCKED = True
+    worker.ENABLE_PRODUCTION = True
+
+    # Only the tested SUGGEST path.
+    worker.ENABLE_SUGGEST_SUBMIT = True
+
+    # Explicitly keep everything else disabled.
+    worker.ENABLE_CREATE_SUBMIT = False
+    worker.ENABLE_SUBSCRIBE = False
+    worker.ENABLE_JOIN_REQUESTS = False
+    worker.ENABLE_TEST_SUBMIT = False
+
+    worker.MAX_POSTS = 1
+    worker.MAX_NEW_SUBSCRIPTIONS = 0
+    worker.MAX_JOIN_REQUESTS = 0
+
+    worker.main()
+
+    if not state_file.exists():
+        raise RuntimeError(
+            "WORKER_STATE_FILE_MISSING"
+        )
+
+    state = json.loads(
+        state_file.read_text(
+            encoding="utf-8",
+        )
+    )
+
+    record = (
+        state.get("groups", {}).get(group_url)
+    )
+
+    if record is None:
+        # Normalize fallback in case worker normalized URL.
+        groups = state.get("groups", {})
+
+        if len(groups) == 1:
+            record = next(iter(groups.values()))
+
+    if not isinstance(record, dict):
+        raise RuntimeError(
+            "WORKER_GROUP_RESULT_MISSING"
+        )
+
+    result = result_from_record(record)
+
+    # AUTO is deliberately SUGGEST-only in production.
+    if result["status"] == "CREATE_READY_NOT_SUBMITTED":
+        result["status"] = "FLOW_NOT_AVAILABLE"
+        result["flow"] = "CREATE"
+        result["error"] = (
+            "CREATE production submit is disabled"
+        )
+
+    atomic_json(
+        result_file,
+        result,
+    )
+
+    log(
+        f"queue={queue_id} "
+        f"result={result['status']} "
+        f"flow={result.get('flow')}"
+    )
+
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+
+    except Exception as exc:
+        queue_id = os.environ.get(
+            "VKBOT_QUEUE_ID",
+            "unknown",
+        )
+
+        result_file = (
+            RUNTIME / f"queue_{queue_id}.json"
+        )
+
+        error = (
+            f"{type(exc).__name__}: {exc}"
+        )
+
+        log(error)
+
+        # Result is useful for dispatcher diagnostics.
+        # This does NOT convert a safety failure to success.
+        try:
+            atomic_json(
+                result_file,
+                {
+                    "status": "FAILED",
+                    "flow": None,
+                    "message": None,
+                    "capability": None,
+                    "subscription": None,
+                    "error": error,
+                },
+            )
+        except Exception:
+            pass
+
+        traceback.print_exc()
+        sys.exit(20)

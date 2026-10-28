@@ -1,0 +1,2787 @@
+================ vk_worker_production.py ================
+
+# VKBOT PRODUCTION MASTER LOCK V1
+#
+# This file is the dedicated production worker.
+# Real VK mutations MUST NOT run until this master lock
+# is explicitly changed during the final activation step.
+PRODUCTION_MASTER_UNLOCKED = False
+
+from playwright.sync_api import sync_playwright
+from pathlib import Path
+from urllib.parse import urlparse
+from datetime import datetime, timedelta, date
+import json
+import random
+from openpyxl import load_workbook
+import time
+
+# ============================================================
+# VK BOT FINAL V2
+# Один worker: подписки, заявки, "Предложить пост", "Создать",
+# state/антидубли, лимиты, паузы, остановка при проверках VK.
+#
+# ВАЖНО:
+# SUGGEST уже проверен end-to-end.
+# CREATE оставлен выключенным до одного контрольного теста:
+# ENABLE_CREATE_SUBMIT = False
+# ============================================================
+
+BASE = Path("/opt/vkbot")
+PROFILE = BASE / "VKBotChromeServer"
+GROUPS_FILE = BASE / "groups.txt"
+STATE_FILE = BASE / "vk_worker_production_state.json"
+LOG_FILE = BASE / "vk_worker_production.log"
+CHROME = "/root/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome"
+
+PHONE = "+79235866030"
+MESSAGES_FILE = BASE / "messages.xlsx"
+
+# ---------- РЕЖИМЫ ----------
+# TEST       -> только тестовая группа, финальная отправка выключена
+# PREPARE    -> реальные группы: только подписки, без постов и заявок
+# PRODUCTION -> реальные группы, но режим жёстко заблокирован ниже
+MODE = "SCAN"
+TEST_GROUP = "https://vk.ru/club240781173"
+
+# Жёсткий замок production. Не менять до отдельного контрольного этапа.
+ENABLE_PRODUCTION = False
+
+# TEST: доходим до финальной кнопки, но НЕ отправляем.
+ENABLE_TEST_SUBMIT = False
+
+# PREPARE: разрешены только подписки.
+ENABLE_SUBSCRIBE = False
+
+# Эти действия в объединённой безопасной версии выключены.
+ENABLE_JOIN_REQUESTS = False
+ENABLE_SUGGEST_SUBMIT = False
+ENABLE_CREATE_SUBMIT = False
+
+# ---------- ЛИМИТЫ ЗА ОДИН ЗАПУСК ----------
+MAX_POSTS = 1
+MAX_NEW_SUBSCRIPTIONS = 5
+MAX_JOIN_REQUESTS = 5
+
+# ---------- ПАУЗЫ ----------
+MIN_GROUP_PAUSE_SEC = 4
+MAX_GROUP_PAUSE_SEC = 8
+MIN_ACTION_PAUSE_SEC = 1.2
+MAX_ACTION_PAUSE_SEC = 2.8
+
+MONTHS_RU = [
+    "января", "февраля", "марта", "апреля", "мая", "июня",
+    "июля", "августа", "сентября", "октября", "ноября", "декабря",
+]
+
+MESSAGE_TEMPLATE = """Привет всем! Водитель, еду {DATES}.
+
+Маршрут следования: Минусинск -> Абакан -> Черногорск -> Красноярск и обратно.
+
+График:
+Минусинск в 7:30
+Абакан в 8:00
+Черногорск в 8:30
+
+Обратно (Красноярск):
+ТРЦ Планета в 14:30
+Аэропорт в 15:00
+
+Берём посылки!
+Опытный водитель, комфортный авто.
+
+Телефон: {PHONE}"""
+
+
+class WorkerStop(RuntimeError):
+    pass
+
+
+def log(msg):
+    line = f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}"
+    print(line)
+    with LOG_FILE.open("a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+
+def pause(a=MIN_ACTION_PAUSE_SEC, b=MAX_ACTION_PAUSE_SEC):
+    time.sleep(random.uniform(a, b))
+
+
+def generate_dates():
+    ds = [datetime.now() + timedelta(days=i) for i in range(3)]
+    if ds[0].month == ds[-1].month:
+        return ", ".join(str(x.day) for x in ds) + " " + MONTHS_RU[ds[0].month - 1]
+    return (
+        f"{ds[0].day} {MONTHS_RU[ds[0].month - 1]}, "
+        f"{ds[1].day} {MONTHS_RU[ds[1].month - 1]}, "
+        f"{ds[2].day} {MONTHS_RU[ds[2].month - 1]}"
+    )
+
+
+def load_messages():
+    """
+    Load posting templates from messages.xlsx.
+
+    Expected workbook:
+      sheet: first sheet
+      column A header: message
+      rows 2+: message templates
+
+    Empty rows are ignored.
+    """
+    if not MESSAGES_FILE.exists():
+        raise RuntimeError(
+            f"MESSAGES_FILE_NOT_FOUND:{MESSAGES_FILE}"
+        )
+
+    wb = load_workbook(
+        MESSAGES_FILE,
+        read_only=True,
+        data_only=True,
+    )
+
+    try:
+        ws = wb[wb.sheetnames[0]]
+
+        header = ws.cell(1, 1).value
+
+        if str(header).strip().lower() != "message":
+            raise RuntimeError(
+                f"MESSAGES_BAD_HEADER:{header!r}"
+            )
+
+        messages = []
+
+        for row in range(2, ws.max_row + 1):
+            value = ws.cell(row, 1).value
+
+            if value is None:
+                continue
+
+            text = str(value).strip()
+
+            if not text:
+                continue
+
+            messages.append(text)
+
+        if not messages:
+            raise RuntimeError("MESSAGES_EMPTY")
+
+        return messages
+
+    finally:
+        wb.close()
+
+
+def build_message():
+    messages = load_messages()
+
+    template = random.choice(messages)
+
+    return (
+        template
+        .replace("{PHONE}", PHONE)
+        .replace("{DATES}", generate_dates())
+    )
+
+
+
+def normalize_vk_url(raw):
+    raw = raw.strip()
+    if not raw:
+        return None
+    if "://" not in raw:
+        raw = "https://" + raw
+
+    parsed = urlparse(raw)
+    host = parsed.netloc.lower().split(":")[0]
+
+    if host in {"vk.com", "www.vk.com", "vk.ru", "www.vk.ru"}:
+        host = "vk.ru"
+
+    path = "/" + parsed.path.strip("/")
+    if path == "/":
+        return None
+
+    return f"https://{host}{path}"
+
+
+def load_groups():
+    if MODE == "TEST":
+        return [TEST_GROUP]
+
+    if MODE == "PRODUCTION" and not ENABLE_PRODUCTION:
+        raise RuntimeError("PRODUCTION_LOCKED")
+
+    if MODE not in {"SCAN", "PREPARE", "PRODUCTION"}:
+        raise RuntimeError(f"UNKNOWN_MODE:{MODE}")
+
+    if not GROUPS_FILE.exists():
+        raise RuntimeError(f"Нет файла {GROUPS_FILE}")
+
+    out, seen = [], set()
+
+    for raw in GROUPS_FILE.read_text(encoding="utf-8-sig").splitlines():
+        url = normalize_vk_url(raw)
+        if not url:
+            continue
+
+        key = url.lower()
+        if key in seen:
+            continue
+
+        seen.add(key)
+        out.append(url)
+
+    return out
+
+def load_state():
+    if not STATE_FILE.exists():
+        return {"groups": {}, "runs": []}
+    try:
+        d = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        if not isinstance(d, dict):
+            raise ValueError
+        d.setdefault("groups", {})
+        d.setdefault("runs", [])
+        return d
+    except Exception:
+        raise RuntimeError("STATE повреждён. Worker остановлен для защиты от дублей.")
+
+
+def save_state(state):
+    tmp = STATE_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(STATE_FILE)
+
+
+def update_group(state, url, status, **extra):
+    old = state["groups"].get(url, {})
+    rec = dict(old)
+    rec.update(extra)
+    rec["status"] = status
+    rec["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    state["groups"][url] = rec
+    save_state(state)
+    log(f"STATE {url} -> {status}")
+
+
+def visible(locator):
+    out = []
+    try:
+        n = locator.count()
+    except Exception:
+        return out
+    for i in range(n):
+        try:
+            x = locator.nth(i)
+            if x.is_visible():
+                out.append(x)
+        except Exception:
+            pass
+    return out
+
+
+def exact(page, text):
+    return visible(page.get_by_text(text, exact=True))
+
+
+def detect_block(page):
+    u = page.url.lower()
+    if "challenge" in u:
+        return "VK_CHALLENGE"
+    markers = [
+        "Проверяем, что вы не робот",
+        "Подтвердите, что вы не робот",
+        "Подтвердите вход",
+        "Слишком много попыток",
+    ]
+    for m in markers:
+        try:
+            if visible(page.get_by_text(m, exact=False)):
+                return "VK_VERIFICATION"
+        except Exception:
+            pass
+    return None
+
+
+def assert_no_block(page):
+    b = detect_block(page)
+    if b:
+        raise WorkerStop(b)
+
+
+def scan_entries(page):
+    """Ищем управляющие элементы по странице без кликов."""
+    result = {
+        "suggest": None,
+        "create": None,
+        "subscribe": None,
+        "join": None,
+        "subscribed": False,
+    }
+
+    page.evaluate("window.scrollTo(0,0)")
+    pause(.5, .9)
+
+    for step in range(16):
+        assert_no_block(page)
+
+        sug = exact(page, "Предложить пост")
+        cre = exact(page, "Создать")
+        sub = exact(page, "Подписаться")
+        joi = exact(page, "Подать заявку")
+        yes = exact(page, "Вы подписаны")
+
+        if len(sug) == 1 and result["suggest"] is None:
+            result["suggest"] = sug[0]
+        if len(cre) == 1 and result["create"] is None:
+            result["create"] = cre[0]
+        if len(sub) == 1 and result["subscribe"] is None:
+            result["subscribe"] = sub[0]
+        if len(joi) == 1 and result["join"] is None:
+            result["join"] = joi[0]
+        if yes:
+            result["subscribed"] = True
+
+        # Предложение поста имеет приоритет.
+        if result["suggest"] is not None:
+            break
+
+        page.evaluate("window.scrollBy(0,300)")
+        pause(.65, 1.05)
+
+    return result
+
+
+def unique_editor(page):
+    editors = visible(page.locator('[role="textbox"][contenteditable="true"]'))
+    if len(editors) != 1:
+        raise RuntimeError(f"EDITOR_NOT_UNIQUE:{len(editors)}")
+    return editors[0]
+
+
+def open_post_editor(page, entry, flow):
+    entry.click(timeout=10000)
+    pause(1.4, 2.0)
+    assert_no_block(page)
+
+    if len(exact(page, "Новый пост")) != 1:
+        raise RuntimeError(f"{flow}_NEW_POST_NOT_UNIQUE")
+
+    return unique_editor(page)
+
+
+def fill_and_next(page, editor, text):
+    editor.fill(text)
+    if editor.inner_text().strip() != text.strip():
+        raise RuntimeError("EDITOR_TEXT_VERIFY_FAILED")
+    log("EDITOR TEXT VERIFIED")
+
+    nxt = exact(page, "Далее")
+    if len(nxt) != 1:
+        raise RuntimeError(f"NEXT_NOT_UNIQUE:{len(nxt)}")
+
+    btn = nxt[0].locator(
+        "xpath=ancestor-or-self::*[self::button or @role='button'][1]"
+    )
+    if btn.count() != 1:
+        raise RuntimeError("NEXT_BUTTON_NOT_UNIQUE")
+
+    btn.click(timeout=10000)
+    pause(1.8, 2.5)
+    assert_no_block(page)
+    log("NEXT CLICKED")
+
+
+def dialog_buttons(page, names):
+    found = []
+    for dialog in visible(page.locator('[role="dialog"]')):
+        for name in names:
+            found.extend(
+                visible(dialog.get_by_role("button", name=name, exact=True))
+            )
+    return found
+
+
+def final_button_suggest(page):
+    items = dialog_buttons(page, ["Предложить пост"])
+    if len(items) != 1:
+        raise RuntimeError(f"SUGGEST_FINAL_NOT_UNIQUE:{len(items)}")
+    return items[0]
+
+
+def final_button_create(page):
+    # VK может называть финальную кнопку по-разному.
+    # Строго требуем ровно одну подходящую кнопку.
+    items = dialog_buttons(page, ["Опубликовать", "Создать", "Разместить", "Отправить"])
+    unique = []
+    seen = set()
+    for x in items:
+        try:
+            key = x.evaluate("(e)=>e.outerHTML")
+        except Exception:
+            key = str(id(x))
+        if key not in seen:
+            seen.add(key)
+            unique.append(x)
+    if len(unique) != 1:
+        raise RuntimeError(f"CREATE_FINAL_NOT_UNIQUE:{len(unique)}")
+    return unique[0]
+
+
+def inspect_submit(page, flow):
+    pause(2.5, 3.5)
+    assert_no_block(page)
+
+    markers = [
+        "Пост предложен", "Запись предложена", "Предложенный пост",
+        "Предложенные посты", "Отправлено", "Запись опубликована",
+        "Пост опубликован",
+    ]
+    for m in markers:
+        try:
+            if visible(page.get_by_text(m, exact=True)):
+                return "CONFIRMED", f"UI_MARKER:{m}"
+        except Exception:
+            pass
+
+    # Как в успешном тесте: финальный диалог исчез.
+    if flow == "SUGGEST":
+        try:
+            if not dialog_buttons(page, ["Предложить пост"]):
+                return "PROBABLE", "FINAL_DIALOG_DISAPPEARED"
+        except Exception:
+            pass
+
+    return "UNCERTAIN", "NO_CONFIRMATION_MARKER"
+
+
+def remote_submit(page, state, url, text, flow, button):
+    # Критическая защита: REMOTE_ATTEMPTED пишется ДО клика.
+    update_group(state, url, "INTENT", flow=flow, message=text)
+    update_group(state, url, "REMOTE_ATTEMPTED", flow=flow, message=text)
+    log(f"{flow}: REMOTE SUBMIT ONE ATTEMPT")
+
+    try:
+        button.click(timeout=10000, no_wait_after=True)
+    except Exception as exc:
+        update_group(
+            state, url, "UNCERTAIN",
+            flow=flow, message=text, error=repr(exc)
+        )
+        return "REMOTE_ATTEMPT"
+
+    result, reason = inspect_submit(page, flow)
+    update_group(
+        state, url, result,
+        flow=flow, message=text, reason=reason
+    )
+    log(f"{flow}: RESULT {result} ({reason})")
+    return "REMOTE_ATTEMPT"
+
+
+def do_suggest(page, state, url, entry, text):
+    editor = open_post_editor(page, entry, "SUGGEST")
+    fill_and_next(page, editor, text)
+    btn = final_button_suggest(page)
+    log("SUGGEST FINAL BUTTON UNIQUE")
+
+    if MODE == "TEST":
+        update_group(
+            state, url, "TEST_READY_NOT_SUBMITTED",
+            flow="SUGGEST", message=text
+        )
+        print("=" * 72)
+        print("REMOTE COMMIT BOUNDARY REACHED")
+        print("TEST GROUP:", url)
+        print("FINAL SUBMIT:", "ENABLED" if ENABLE_TEST_SUBMIT else "DISABLED")
+        print("=" * 72)
+
+        if not ENABLE_TEST_SUBMIT:
+            log("TEST submit disabled: final click NOT performed")
+            return "SKIP"
+
+        return remote_submit(page, state, url, text, "SUGGEST", btn)
+
+    if MODE == "PRODUCTION":
+        if not ENABLE_PRODUCTION:
+            raise RuntimeError("PRODUCTION_LOCKED")
+        if not ENABLE_SUGGEST_SUBMIT:
+            update_group(state, url, "SUGGEST_DISABLED")
+            return "SKIP"
+        return remote_submit(page, state, url, text, "SUGGEST", btn)
+
+    update_group(state, url, "SUGGEST_SKIPPED_IN_PREPARE")
+    return "SKIP"
+
+def do_create(page, state, url, entry, text):
+    editor = open_post_editor(page, entry, "CREATE")
+    fill_and_next(page, editor, text)
+
+    # Даже при выключенном submit мы доходим до финального экрана:
+    # так можно безопасно проверить интерфейс.
+    btn = final_button_create(page)
+    log("CREATE FINAL BUTTON UNIQUE")
+
+    if not ENABLE_CREATE_SUBMIT:
+        update_group(
+            state, url, "CREATE_READY_NOT_SUBMITTED",
+            flow="CREATE",
+            message=text
+        )
+        log("CREATE submit disabled: final click NOT performed")
+        return "SKIP"
+
+    return remote_submit(page, state, url, text, "CREATE", btn)
+
+
+def click_membership(page, state, url, kind, button):
+    status_before = "SUBSCRIBE_INTENT" if kind == "SUBSCRIBE" else "JOIN_REQUEST_INTENT"
+    status_after = "SUBSCRIBE_CLICKED" if kind == "SUBSCRIBE" else "JOIN_REQUEST_SENT"
+
+    update_group(state, url, status_before)
+    button.click(timeout=10000)
+    pause(1.8, 2.8)
+    assert_no_block(page)
+    update_group(state, url, status_after)
+    return status_after
+
+
+def read_subscription_state(page):
+    """
+    Strong signals only:
+    SUBSCRIBED     -> 'Вы подписаны' / 'Отписаться'
+    NOT_SUBSCRIBED -> 'Подписаться'
+    UNKNOWN        -> no safe conclusion
+    """
+    page.evaluate("window.scrollTo(0,0)")
+    pause(.5, .8)
+
+    saw_subscribe = False
+
+    for _ in range(16):
+        assert_no_block(page)
+
+        if exact(page, "Вы подписаны") or exact(page, "Отписаться"):
+            return "SUBSCRIBED"
+
+        if exact(page, "Подписаться"):
+            saw_subscribe = True
+
+        page.evaluate("window.scrollBy(0,300)")
+        pause(.45, .75)
+
+    return "NOT_SUBSCRIBED" if saw_subscribe else "UNKNOWN"
+
+
+def find_unique_subscribe_button(page):
+    page.evaluate("window.scrollTo(0,0)")
+    pause(.4, .7)
+
+    for _ in range(16):
+        assert_no_block(page)
+        items = exact(page, "Подписаться")
+
+        if len(items) == 1:
+            return items[0]
+
+        if len(items) > 1:
+            raise RuntimeError(f"SUBSCRIBE_NOT_UNIQUE:{len(items)}")
+
+        page.evaluate("window.scrollBy(0,300)")
+        pause(.45, .75)
+
+    return None
+
+
+def process_prepare_group(page, state, url, counters):
+    log("=" * 72)
+    log(f"PREPARE OPEN {url}")
+
+    page.goto(url, wait_until="domcontentloaded", timeout=60000)
+    pause(2.5, 3.5)
+    assert_no_block(page)
+
+    before = read_subscription_state(page)
+    log(f"SUBSCRIPTION BEFORE -> {before}")
+
+    if before == "SUBSCRIBED":
+        update_group(state, url, "SUBSCRIBED_CONFIRMED")
+        return "SKIP"
+
+    if before != "NOT_SUBSCRIBED":
+        update_group(state, url, "VERIFY_UNCERTAIN")
+        return "SKIP"
+
+    if counters["subs"] >= MAX_NEW_SUBSCRIPTIONS:
+        update_group(state, url, "SUBSCRIBE_LIMIT_REACHED")
+        return "SKIP"
+
+    button = find_unique_subscribe_button(page)
+    if button is None:
+        update_group(state, url, "SUBSCRIBE_FAILED", reason="BUTTON_NOT_FOUND")
+        return "SKIP"
+
+    update_group(state, url, "SUBSCRIBE_INTENT")
+
+    try:
+        button.click(timeout=10000)
+    except Exception as exc:
+        update_group(state, url, "SUBSCRIBE_FAILED", error=repr(exc))
+        return "SKIP"
+
+    # Click happened: count it immediately; never retry automatically this run.
+    counters["subs"] += 1
+    update_group(state, url, "SUBSCRIBE_CLICKED_UNCERTAIN")
+    pause(2.0, 3.0)
+
+    after = read_subscription_state(page)
+    log(f"SUBSCRIPTION AFTER -> {after}")
+
+    if after == "SUBSCRIBED":
+        update_group(state, url, "SUBSCRIBED_CONFIRMED")
+    else:
+        # One read-only reload verification; no second click.
+        page.reload(wait_until="domcontentloaded", timeout=60000)
+        pause(2.0, 3.0)
+        verify = read_subscription_state(page)
+        log(f"SUBSCRIPTION VERIFY -> {verify}")
+
+        if verify == "SUBSCRIBED":
+            update_group(state, url, "SUBSCRIBED_CONFIRMED")
+        else:
+            update_group(state, url, "SUBSCRIBE_CLICKED_UNCERTAIN",
+                         verify=verify)
+
+    return "SKIP"
+
+
+def process_group(page, state, url, text, counters):
+    old = state["groups"].get(url, {}).get("status")
+
+    # После возможного remote commit эту группу автоматически не трогаем.
+    if old in {"REMOTE_ATTEMPTED", "CONFIRMED", "PROBABLE", "UNCERTAIN"}:
+        log(f"SKIP remote-state {url}: {old}")
+        return "SKIP"
+
+    log("=" * 72)
+    log(f"OPEN {url}")
+    page.goto(url, wait_until="domcontentloaded", timeout=60000)
+    pause(2.8, 4.0)
+    assert_no_block(page)
+
+    title = page.title()
+    log(f"FINAL URL {page.url}")
+    log(f"TITLE {title}")
+
+    if "deleted" in title.lower():
+        update_group(state, url, "DELETED")
+        return "SKIP"
+
+    entries = scan_entries(page)
+
+    # 1. Уже доступна публикация.
+    if entries["suggest"] is not None:
+        return do_suggest(page, state, url, entries["suggest"], text)
+
+    # 2. CREATE.
+    if entries["create"] is not None:
+        return do_create(page, state, url, entries["create"], text)
+
+    # 3. Закрытая группа — заявка.
+    if entries["join"] is not None:
+        if old == "JOIN_REQUEST_SENT":
+            log("JOIN request already sent earlier")
+            return "SKIP"
+
+        if not ENABLE_JOIN_REQUESTS:
+            update_group(state, url, "JOIN_REQUEST_REQUIRED")
+            return "SKIP"
+
+        if counters["joins"] >= MAX_JOIN_REQUESTS:
+            update_group(state, url, "JOIN_LIMIT_REACHED")
+            return "SKIP"
+
+        click_membership(page, state, url, "JOIN", entries["join"])
+        counters["joins"] += 1
+        return "SKIP"
+
+    # 4. Открытая группа — подписка.
+    if entries["subscribe"] is not None:
+        if old == "SUBSCRIBE_CLICKED":
+            log("Subscribe already clicked earlier")
+            return "SKIP"
+
+        if not ENABLE_SUBSCRIBE:
+            update_group(state, url, "SUBSCRIBE_REQUIRED")
+            return "SKIP"
+
+        if counters["subs"] >= MAX_NEW_SUBSCRIPTIONS:
+            update_group(state, url, "SUBSCRIBE_LIMIT_REACHED")
+            return "SKIP"
+
+        click_membership(page, state, url, "SUBSCRIBE", entries["subscribe"])
+        counters["subs"] += 1
+        return "SKIP"
+
+    update_group(state, url, "NO_SUPPORTED_ACTION")
+    return "SKIP"
+
+
+
+def assert_runtime_safety():
+    if MODE == "PRODUCTION" and not ENABLE_PRODUCTION:
+        raise RuntimeError("PRODUCTION_LOCKED")
+    if MODE == "PRODUCTION" and ENABLE_CREATE_SUBMIT:
+        raise RuntimeError(
+            "CREATE_PRODUCTION_NOT_APPROVED: CREATE has only passed dry-run"
+        )
+
+def main():
+    assert_runtime_safety()
+    if MODE == "PRODUCTION" and not ENABLE_PRODUCTION:
+        raise RuntimeError(
+            "PRODUCTION_LOCKED: real-group posting is disabled."
+        )
+
+    groups = load_groups()
+    state = load_state()
+    text = build_message()
+    counters = {"posts": 0, "subs": 0, "joins": 0}
+
+    log("=" * 72)
+    log(f"VK WORKER UNIFIED START MODE={MODE}")
+    log(f"GROUPS={len(groups)}")
+    log(
+        f"FLAGS production={ENABLE_PRODUCTION} "
+        f"test_submit={ENABLE_TEST_SUBMIT} "
+        f"subscribe={ENABLE_SUBSCRIBE}"
+    )
+
+    print()
+    print("=" * 72)
+    print("VK WORKER UNIFIED")
+    print("MODE:", MODE)
+    print("PRODUCTION:", "ENABLED" if ENABLE_PRODUCTION else "LOCKED")
+    print("TEST FINAL SUBMIT:", "ENABLED" if ENABLE_TEST_SUBMIT else "DISABLED")
+    print("GROUPS:", len(groups))
+    print("=" * 72)
+
+    print("\nFINAL MESSAGE:\n" + "-" * 60)
+    print(text)
+    print("-" * 60 + "\n")
+
+    ctx = None
+
+    try:
+        with sync_playwright() as p:
+            ctx = p.chromium.launch_persistent_context(
+                user_data_dir=str(PROFILE),
+                executable_path=CHROME,
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                ],
+                viewport=None,
+                timeout=120000,
+            )
+
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
+
+            for i, url in enumerate(groups, 1):
+                log(f"GROUP {i}/{len(groups)}")
+
+                try:
+                    if MODE == "SCAN":
+                        page.goto(url, wait_until="domcontentloaded", timeout=60000)
+                        pause(2.0, 3.0)
+                        assert_no_block(page)
+                        entries = scan_entries(page)
+                        sub_state = read_subscription_state(page)
+                        update_group(
+                            state,
+                            url,
+                            "SCAN_ONLY",
+                            subscription=sub_state,
+                            create=bool(entries.get("create")),
+                            suggest=bool(entries.get("suggest")),
+                        )
+                        log(
+                            f"SCAN {url} subscription={sub_state} "
+                            f"create={bool(entries.get('create'))} "
+                            f"suggest={bool(entries.get('suggest'))}"
+                        )
+
+                    elif MODE == "PREPARE":
+                        if not ENABLE_SUBSCRIBE:
+                            raise RuntimeError("PREPARE_SUBSCRIBE_DISABLED")
+
+                        process_prepare_group(
+                            page, state, url, counters
+                        )
+
+                        if counters["subs"] >= MAX_NEW_SUBSCRIPTIONS:
+                            log("STOP: subscription limit reached")
+                            break
+
+                    elif MODE == "TEST":
+                        # TEST is hard-scoped by load_groups() to TEST_GROUP.
+                        result = process_group(
+                            page, state, url, text, counters
+                        )
+
+                        if result == "REMOTE_ATTEMPT":
+                            counters["posts"] += 1
+
+                        # Exactly one test group.
+                        break
+
+                    elif MODE == "PRODUCTION":
+                        if not ENABLE_PRODUCTION:
+                            raise RuntimeError("PRODUCTION_LOCKED")
+
+                        result = process_group(
+                            page, state, url, text, counters
+                        )
+
+                        if result == "REMOTE_ATTEMPT":
+                            counters["posts"] += 1
+                            log("STOP after remote post attempt")
+                            break
+
+                    else:
+                        raise RuntimeError(f"UNKNOWN_MODE:{MODE}")
+
+                except WorkerStop as exc:
+                    log(f"CRITICAL VK STOP: {exc}")
+                    break
+
+                except Exception as exc:
+                    log(f"ERROR {url}: {repr(exc)}")
+
+                    current = state["groups"].get(url, {}).get("status")
+
+                    if current == "REMOTE_ATTEMPTED":
+                        update_group(
+                            state, url, "UNCERTAIN",
+                            error=repr(exc), message=text
+                        )
+                        counters["posts"] += 1
+                        log("STOP: error after remote attempt; NO RETRY")
+                        break
+
+                    update_group(state, url, "ERROR", error=repr(exc))
+
+                pause(MIN_GROUP_PAUSE_SEC, MAX_GROUP_PAUSE_SEC)
+
+            state["runs"].append({
+                "mode": MODE,
+                "finished_at": datetime.now().isoformat(timespec="seconds"),
+                "posts": counters["posts"],
+                "subscriptions": counters["subs"],
+                "join_requests": counters["joins"],
+            })
+            state["runs"] = state["runs"][-50:]
+            save_state(state)
+
+            print()
+            print("=" * 72)
+            print("VK WORKER UNIFIED FINISHED")
+            print("MODE:", MODE)
+            print("POST ATTEMPTS:", counters["posts"])
+            print("NEW SUBSCRIPTIONS:", counters["subs"])
+            print("JOIN REQUESTS:", counters["joins"])
+            print("STATE:", STATE_FILE)
+            print("LOG:", LOG_FILE)
+            print("=" * 72)
+
+    except KeyboardInterrupt:
+        log("STOPPED BY USER (Ctrl+C)")
+
+    finally:
+        if ctx is not None:
+            try:
+                ctx.close()
+            except Exception as exc:
+                pass
+
+
+if __name__ == "__main__":
+    main()
+
+================ vk_queue_dispatcher.py =================
+from pathlib import Path
+from datetime import datetime
+import json
+import os
+import random
+import subprocess
+import sys
+import time
+
+import vk_multi_account as multi
+
+BASE = Path("/opt/vkbot")
+
+WORKER = BASE / "vk_worker_production.py"
+PYTHON = BASE / "venv" / "bin" / "python"
+
+RUNTIME = BASE / "runtime"
+
+STOP_FILE = RUNTIME / "production.stop"
+
+DISPATCHER_LOG = (
+    BASE / "vk_queue_dispatcher.log"
+)
+
+# ============================================================
+# HARD LOCK
+# ============================================================
+
+PRODUCTION_MASTER_UNLOCKED = False
+REAL_VK_ACTIONS_ENABLED = False
+
+# One account at a time.
+MAX_PARALLEL = 1
+
+
+def log(message):
+    line = (
+        f"[{datetime.now():%Y-%m-%d %H:%M:%S}] "
+        f"{message}"
+    )
+
+    print(
+        line,
+        flush=True,
+    )
+
+    with DISPATCHER_LOG.open(
+        "a",
+        encoding="utf-8",
+    ) as f:
+        f.write(
+            line + "\n"
+        )
+
+
+def assert_safety():
+    if not PRODUCTION_MASTER_UNLOCKED:
+        raise RuntimeError(
+            "DISPATCHER_MASTER_LOCKED"
+        )
+
+    if not REAL_VK_ACTIONS_ENABLED:
+        raise RuntimeError(
+            "DISPATCHER_REAL_ACTIONS_DISABLED"
+        )
+
+    multi.assert_global_safety()
+
+
+def worker_environment(
+    account,
+    job,
+):
+    env = os.environ.copy()
+
+    env[
+        "VKBOT_MULTI_ACCOUNT"
+    ] = "1"
+
+    env[
+        "VKBOT_ACCOUNT_ID"
+    ] = str(
+        account["id"]
+    )
+
+    env[
+        "VKBOT_ACCOUNT_CODE"
+    ] = account["code"]
+
+    env[
+        "VKBOT_PROFILE"
+    ] = account["profile_dir"]
+
+    env[
+        "VKBOT_SINGLE_GROUP"
+    ] = job["group_url"]
+
+    env[
+        "VKBOT_QUEUE_ID"
+    ] = str(
+        job["id"]
+    )
+
+    env[
+        "VKBOT_REQUESTED_FLOW"
+    ] = job["requested_flow"]
+
+    return env
+
+
+def run_one(
+    account,
+    job,
+):
+    assert_safety()
+
+    multi.mark_running(
+        job["id"],
+        account["id"],
+    )
+
+    log(
+        f"START queue={job['id']} "
+        f"account={account['code']} "
+        f"group={job['group_url']}"
+    )
+
+    env = worker_environment(
+        account,
+        job,
+    )
+
+    try:
+        result = subprocess.run(
+            [
+                str(PYTHON),
+                str(WORKER),
+            ],
+            cwd=str(BASE),
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=15 * 60,
+        )
+
+    except subprocess.TimeoutExpired:
+        multi.finish_job(
+            job["id"],
+            "FAILED",
+            error="WORKER_TIMEOUT",
+        )
+
+        multi.finish_account(
+            account["id"]
+        )
+
+        return
+
+    stdout = (
+        result.stdout or ""
+    )
+
+    stderr = (
+        result.stderr or ""
+    )
+
+    combined = (
+        stdout + "\n" + stderr
+    )
+
+    if (
+        "VK_CHALLENGE"
+        in combined
+        or "VK_VERIFICATION"
+        in combined
+    ):
+        multi.set_account_status(
+            account["id"],
+            "VK_CHALLENGE",
+            "VK verification required",
+        )
+
+        multi.set_account_auth(
+            account["id"],
+            "AUTH_REQUIRED",
+            "VK verification required",
+        )
+
+        multi.finish_job(
+            job["id"],
+            "AUTH_REQUIRED",
+            error="VK_CHALLENGE",
+        )
+
+        log(
+            f"AUTH REQUIRED "
+            f"account={account['code']}"
+        )
+
+        return
+
+    if result.returncode != 0:
+        multi.finish_job(
+            job["id"],
+            "FAILED",
+            error=(
+                combined[-3000:]
+            ),
+        )
+
+        multi.finish_account(
+            account["id"]
+        )
+
+        log(
+            f"FAILED queue={job['id']} "
+            f"exit={result.returncode}"
+        )
+
+        return
+
+    result_file = (
+        RUNTIME
+        / (
+            "queue_"
+            + str(job["id"])
+            + ".json"
+        )
+    )
+
+    if not result_file.exists():
+        multi.finish_job(
+            job["id"],
+            "FAILED",
+            error=(
+                "WORKER_RESULT_FILE_MISSING"
+            ),
+        )
+
+        multi.finish_account(
+            account["id"]
+        )
+
+        return
+
+    data = json.loads(
+        result_file.read_text(
+            encoding="utf-8"
+        )
+    )
+
+    status = data.get(
+        "status",
+        "FAILED",
+    )
+
+    flow = data.get(
+        "flow"
+    )
+
+    message = data.get(
+        "message"
+    )
+
+    capability = data.get(
+        "capability"
+    )
+
+    subscription = data.get(
+        "subscription"
+    )
+
+    multi.save_capability(
+        account["id"],
+        job["group_url"],
+        capability,
+        subscription,
+        status,
+        data.get("error"),
+    )
+
+    if status in {
+        "CONFIRMED",
+        "PROBABLE",
+        "REMOTE_ATTEMPTED",
+        "UNCERTAIN",
+    }:
+        multi.add_history(
+            job["id"],
+            account["id"],
+            job["group_url"],
+            flow or "UNKNOWN",
+            message,
+            status,
+        )
+
+        multi.finish_job(
+            job["id"],
+            "DONE",
+            result=status,
+            selected_flow=flow,
+            message_text=message,
+        )
+
+    elif status in {
+        "NO_SUPPORTED_ACTION",
+        "FLOW_NOT_AVAILABLE",
+        "SUBSCRIBE_REQUIRED",
+        "JOIN_REQUEST_REQUIRED",
+    }:
+        multi.finish_job(
+            job["id"],
+            "SKIPPED",
+            result=status,
+            selected_flow=flow,
+            message_text=message,
+        )
+
+    else:
+        multi.finish_job(
+            job["id"],
+            "FAILED",
+            result=status,
+            error=data.get(
+                "error"
+            ),
+            selected_flow=flow,
+            message_text=message,
+        )
+
+    multi.finish_account(
+        account["id"]
+    )
+
+    try:
+        result_file.unlink()
+    except Exception:
+        pass
+
+
+def main():
+    multi.init_db()
+    multi.reset_interrupted_jobs()
+
+    RUNTIME.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    if STOP_FILE.exists():
+        STOP_FILE.unlink()
+
+    assert_safety()
+
+    log(
+        "QUEUE DISPATCHER START"
+    )
+
+    while True:
+        if STOP_FILE.exists():
+            log(
+                "STOP FILE DETECTED"
+            )
+            break
+
+        job = multi.next_job()
+
+        if not job:
+            log(
+                "QUEUE EMPTY"
+            )
+            break
+
+        old = (
+            multi.successful_group_before(
+                job["group_url"]
+            )
+        )
+
+        if old:
+            multi.finish_job(
+                job["id"],
+                "SKIPPED",
+                result=(
+                    "GROUP_ALREADY_HAS_"
+                    "REMOTE_HISTORY"
+                ),
+            )
+
+            log(
+                f"SKIP duplicate "
+                f"{job['group_url']}"
+            )
+
+            continue
+
+        account = (
+            multi.choose_account(job)
+        )
+
+        if not account:
+            multi.finish_job(
+                job["id"],
+                "WAITING",
+                error=(
+                    "NO_AVAILABLE_ACCOUNT"
+                ),
+            )
+
+            log(
+                "NO AVAILABLE ACCOUNT"
+            )
+
+            break
+
+        run_one(
+            account,
+            job,
+        )
+
+        if STOP_FILE.exists():
+            break
+
+        minimum = int(
+            multi.get_setting(
+                "min_delay_sec",
+                "900",
+            )
+        )
+
+        maximum = int(
+            multi.get_setting(
+                "max_delay_sec",
+                "2100",
+            )
+        )
+
+        if maximum < minimum:
+            maximum = minimum
+
+        delay = random.randint(
+            minimum,
+            maximum,
+        )
+
+        log(
+            f"NEXT JOB DELAY "
+            f"{delay} sec"
+        )
+
+        for _ in range(delay):
+            if STOP_FILE.exists():
+                break
+
+            time.sleep(1)
+
+    log(
+        "QUEUE DISPATCHER FINISHED"
+    )
+
+
+if __name__ == "__main__":
+    main()
+
+================ vk_production_launcher.py ==============
+#!/opt/vkbot/venv/bin/python
+
+from pathlib import Path
+import ast
+import subprocess
+import sys
+from datetime import datetime
+
+WORKER = Path("/opt/vkbot/vk_worker_production.py")
+LOG = Path("/opt/vkbot/vk_production_launcher.log")
+
+
+def log(message):
+    line = f"[{datetime.now().isoformat(timespec='seconds')}] {message}"
+    print(line, flush=True)
+
+    with LOG.open("a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+
+def read_assignment(name):
+    tree = ast.parse(
+        WORKER.read_text(encoding="utf-8"),
+        filename=str(WORKER),
+    )
+
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == name:
+                    try:
+                        return ast.literal_eval(node.value)
+                    except Exception:
+                        return None
+
+        if isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name) and node.target.id == name:
+                try:
+                    return ast.literal_eval(node.value)
+                except Exception:
+                    return None
+
+    return None
+
+
+def main():
+
+    if not WORKER.exists():
+        log("DENIED: production worker not found")
+        return 10
+
+    master = read_assignment("PRODUCTION_MASTER_UNLOCKED")
+
+    if master is not True:
+        log("DENIED: PRODUCTION_MASTER_UNLOCKED=False")
+        log("NO VK ACTION WAS PERFORMED")
+        return 20
+
+    # Additional mandatory safety checks.
+    mode = read_assignment("MODE")
+    production = read_assignment("ENABLE_PRODUCTION")
+
+    if mode != "PRODUCTION":
+        log(f"DENIED: MODE={mode!r}")
+        return 21
+
+    if production is not True:
+        log(f"DENIED: ENABLE_PRODUCTION={production!r}")
+        return 22
+
+    log("PRODUCTION SAFETY GATE PASSED")
+    log("Starting dedicated production worker")
+
+    result = subprocess.run(
+        [
+            "/opt/vkbot/venv/bin/python",
+            str(WORKER),
+        ],
+        cwd="/opt/vkbot",
+    )
+
+    log(f"Production worker exit code: {result.returncode}")
+
+    return result.returncode
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+================ vk_multi_account.py ====================
+from pathlib import Path
+from datetime import datetime
+from urllib.parse import urlparse
+import json
+import os
+import random
+import sqlite3
+import sys
+import uuid
+
+BASE = Path("/opt/vkbot")
+
+DB_FILE = BASE / "vk_multi_account.sqlite3"
+ACCOUNTS_DIR = BASE / "accounts"
+GROUPS_FILE = BASE / "groups.txt"
+
+# ============================================================
+# GLOBAL HARD SAFETY
+# ============================================================
+
+PRODUCTION_MASTER_UNLOCKED = False
+
+# No mutation is permitted while this is False.
+REAL_VK_ACTIONS_ENABLED = False
+
+# Individual mutation gates.
+SUGGEST_ENABLED = False
+CREATE_ENABLED = False
+SUBSCRIBE_ENABLED = False
+JOIN_ENABLED = False
+
+# One browser / one account at a time.
+MAX_PARALLEL_ACCOUNTS = 1
+
+# Queue policy.
+DEFAULT_MIN_DELAY_SEC = 15 * 60
+DEFAULT_MAX_DELAY_SEC = 35 * 60
+
+# Prevent repeated successful publication to same group.
+DEFAULT_GROUP_COOLDOWN_HOURS = 72
+
+
+def now():
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def normalize_vk_url(raw):
+    raw = str(raw or "").strip()
+
+    if not raw:
+        return None
+
+    if "://" not in raw:
+        raw = "https://" + raw
+
+    parsed = urlparse(raw)
+
+    host = parsed.netloc.lower().split(":")[0]
+
+    if host in {
+        "vk.com",
+        "www.vk.com",
+        "vk.ru",
+        "www.vk.ru",
+    }:
+        host = "vk.ru"
+
+    path = "/" + parsed.path.strip("/")
+
+    if path == "/":
+        return None
+
+    return f"https://{host}{path}"
+
+
+def connect():
+    con = sqlite3.connect(
+        DB_FILE,
+        timeout=30,
+    )
+
+    con.row_factory = sqlite3.Row
+
+    con.execute(
+        "PRAGMA journal_mode=WAL"
+    )
+
+    con.execute(
+        "PRAGMA foreign_keys=ON"
+    )
+
+    return con
+
+
+def init_db():
+    ACCOUNTS_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    con = connect()
+
+    con.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS accounts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            profile_dir TEXT NOT NULL UNIQUE,
+
+            enabled INTEGER NOT NULL DEFAULT 1,
+
+            auth_status TEXT NOT NULL
+                DEFAULT 'UNKNOWN',
+
+            status TEXT NOT NULL
+                DEFAULT 'READY',
+
+            last_error TEXT,
+
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+
+            last_started_at TEXT,
+            last_finished_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS account_group_state (
+            account_id INTEGER NOT NULL,
+            group_url TEXT NOT NULL,
+
+            capability TEXT,
+            subscription TEXT,
+
+            last_status TEXT,
+            last_error TEXT,
+
+            updated_at TEXT NOT NULL,
+
+            PRIMARY KEY (
+                account_id,
+                group_url
+            ),
+
+            FOREIGN KEY(account_id)
+                REFERENCES accounts(id)
+                ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            group_url TEXT NOT NULL,
+
+            account_id INTEGER,
+
+            requested_flow TEXT NOT NULL
+                DEFAULT 'AUTO',
+
+            selected_flow TEXT,
+
+            status TEXT NOT NULL
+                DEFAULT 'WAITING',
+
+            priority INTEGER NOT NULL
+                DEFAULT 100,
+
+            attempts INTEGER NOT NULL
+                DEFAULT 0,
+
+            message_text TEXT,
+
+            result TEXT,
+            error TEXT,
+
+            created_at TEXT NOT NULL,
+            not_before TEXT,
+
+            started_at TEXT,
+            finished_at TEXT,
+
+            FOREIGN KEY(account_id)
+                REFERENCES accounts(id)
+                ON DELETE SET NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS post_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            queue_id INTEGER,
+            account_id INTEGER NOT NULL,
+            group_url TEXT NOT NULL,
+
+            flow TEXT NOT NULL,
+
+            message_text TEXT,
+
+            status TEXT NOT NULL,
+
+            created_at TEXT NOT NULL,
+
+            FOREIGN KEY(queue_id)
+                REFERENCES queue(id)
+                ON DELETE SET NULL,
+
+            FOREIGN KEY(account_id)
+                REFERENCES accounts(id)
+                ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_queue_status
+        ON queue(status, priority, id);
+
+        CREATE INDEX IF NOT EXISTS idx_history_group
+        ON post_history(group_url, created_at);
+
+        CREATE INDEX IF NOT EXISTS idx_account_group
+        ON account_group_state(
+            account_id,
+            group_url
+        );
+        """
+    )
+
+    defaults = {
+        "production_master_unlocked": "0",
+        "real_vk_actions_enabled": "0",
+        "suggest_enabled": "0",
+        "create_enabled": "0",
+        "subscribe_enabled": "0",
+        "join_enabled": "0",
+
+        "min_delay_sec":
+            str(DEFAULT_MIN_DELAY_SEC),
+
+        "max_delay_sec":
+            str(DEFAULT_MAX_DELAY_SEC),
+
+        "group_cooldown_hours":
+            str(DEFAULT_GROUP_COOLDOWN_HOURS),
+    }
+
+    for key, value in defaults.items():
+        con.execute(
+            """
+            INSERT OR IGNORE INTO settings(
+                key,
+                value
+            )
+            VALUES (?, ?)
+            """,
+            (key, value),
+        )
+
+    con.commit()
+    con.close()
+
+
+def get_setting(key, default=None):
+    con = connect()
+
+    row = con.execute(
+        """
+        SELECT value
+        FROM settings
+        WHERE key=?
+        """,
+        (key,),
+    ).fetchone()
+
+    con.close()
+
+    if row is None:
+        return default
+
+    return row["value"]
+
+
+def setting_bool(key):
+    return get_setting(
+        key,
+        "0",
+    ) == "1"
+
+
+def set_setting(key, value):
+    con = connect()
+
+    con.execute(
+        """
+        INSERT INTO settings(key, value)
+        VALUES (?, ?)
+        ON CONFLICT(key)
+        DO UPDATE SET value=excluded.value
+        """,
+        (key, str(value)),
+    )
+
+    con.commit()
+    con.close()
+
+
+def assert_global_safety():
+    # File-level lock.
+    if not PRODUCTION_MASTER_UNLOCKED:
+        raise RuntimeError(
+            "MULTI_ACCOUNT_MASTER_LOCKED"
+        )
+
+    # DB-level lock.
+    if not setting_bool(
+        "production_master_unlocked"
+    ):
+        raise RuntimeError(
+            "DATABASE_MASTER_LOCKED"
+        )
+
+    if not REAL_VK_ACTIONS_ENABLED:
+        raise RuntimeError(
+            "REAL_VK_ACTIONS_DISABLED"
+        )
+
+    if not setting_bool(
+        "real_vk_actions_enabled"
+    ):
+        raise RuntimeError(
+            "DATABASE_REAL_ACTIONS_DISABLED"
+        )
+
+
+def safe_code(value):
+    value = str(value).strip().lower()
+
+    out = []
+
+    for ch in value:
+        if ch.isalnum() or ch in "_-":
+            out.append(ch)
+
+    code = "".join(out).strip("_-")
+
+    if not code:
+        raise ValueError(
+            "ACCOUNT_CODE_EMPTY"
+        )
+
+    return code
+
+
+def add_account(code, name):
+    code = safe_code(code)
+    name = str(name).strip()
+
+    if not name:
+        raise ValueError(
+            "ACCOUNT_NAME_EMPTY"
+        )
+
+    profile = (
+        ACCOUNTS_DIR
+        / code
+        / "profile"
+    )
+
+    profile.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    os.chmod(
+        ACCOUNTS_DIR / code,
+        0o700,
+    )
+
+    con = connect()
+
+    ts = now()
+
+    try:
+        con.execute(
+            """
+            INSERT INTO accounts(
+                code,
+                name,
+                profile_dir,
+                enabled,
+                auth_status,
+                status,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, 1, 'UNKNOWN',
+                    'READY', ?, ?)
+            """,
+            (
+                code,
+                name,
+                str(profile),
+                ts,
+                ts,
+            ),
+        )
+
+        con.commit()
+
+    finally:
+        con.close()
+
+    return profile
+
+
+def list_accounts():
+    con = connect()
+
+    rows = con.execute(
+        """
+        SELECT *
+        FROM accounts
+        ORDER BY id
+        """
+    ).fetchall()
+
+    con.close()
+
+    return rows
+
+
+def get_account(account_id):
+    con = connect()
+
+    row = con.execute(
+        """
+        SELECT *
+        FROM accounts
+        WHERE id=?
+        """,
+        (account_id,),
+    ).fetchone()
+
+    con.close()
+
+    return row
+
+
+def set_account_enabled(
+    account_id,
+    enabled,
+):
+    con = connect()
+
+    con.execute(
+        """
+        UPDATE accounts
+        SET enabled=?,
+            status=?,
+            updated_at=?
+        WHERE id=?
+        """,
+        (
+            1 if enabled else 0,
+            "READY" if enabled else "PAUSED",
+            now(),
+            account_id,
+        ),
+    )
+
+    con.commit()
+    con.close()
+
+
+def set_account_auth(
+    account_id,
+    auth_status,
+    error=None,
+):
+    con = connect()
+
+    con.execute(
+        """
+        UPDATE accounts
+        SET auth_status=?,
+            last_error=?,
+            updated_at=?
+        WHERE id=?
+        """,
+        (
+            auth_status,
+            error,
+            now(),
+            account_id,
+        ),
+    )
+
+    con.commit()
+    con.close()
+
+
+def set_account_status(
+    account_id,
+    status,
+    error=None,
+):
+    con = connect()
+
+    con.execute(
+        """
+        UPDATE accounts
+        SET status=?,
+            last_error=?,
+            updated_at=?
+        WHERE id=?
+        """,
+        (
+            status,
+            error,
+            now(),
+            account_id,
+        ),
+    )
+
+    con.commit()
+    con.close()
+
+
+def queue_group(
+    group_url,
+    account_id=None,
+    requested_flow="AUTO",
+    priority=100,
+):
+    url = normalize_vk_url(
+        group_url
+    )
+
+    if not url:
+        raise ValueError(
+            "INVALID_GROUP_URL"
+        )
+
+    flow = str(
+        requested_flow
+    ).upper()
+
+    if flow not in {
+        "AUTO",
+        "SUGGEST",
+        "CREATE",
+    }:
+        raise ValueError(
+            "INVALID_FLOW"
+        )
+
+    con = connect()
+
+    # Do not create duplicate waiting jobs.
+    row = con.execute(
+        """
+        SELECT id
+        FROM queue
+        WHERE group_url=?
+          AND status IN (
+              'WAITING',
+              'RUNNING'
+          )
+        LIMIT 1
+        """,
+        (url,),
+    ).fetchone()
+
+    if row:
+        con.close()
+        return row["id"], False
+
+    cur = con.execute(
+        """
+        INSERT INTO queue(
+            group_url,
+            account_id,
+            requested_flow,
+            status,
+            priority,
+            created_at
+        )
+        VALUES (?, ?, ?, 'WAITING', ?, ?)
+        """,
+        (
+            url,
+            account_id,
+            flow,
+            priority,
+            now(),
+        ),
+    )
+
+    queue_id = cur.lastrowid
+
+    con.commit()
+    con.close()
+
+    return queue_id, True
+
+
+def queue_groups_file():
+    if not GROUPS_FILE.exists():
+        raise RuntimeError(
+            f"GROUPS_FILE_NOT_FOUND:"
+            f"{GROUPS_FILE}"
+        )
+
+    added = 0
+    existing = 0
+
+    seen = set()
+
+    for raw in GROUPS_FILE.read_text(
+        encoding="utf-8-sig"
+    ).splitlines():
+
+        url = normalize_vk_url(raw)
+
+        if not url:
+            continue
+
+        if url.lower() in seen:
+            continue
+
+        seen.add(url.lower())
+
+        _, created = queue_group(url)
+
+        if created:
+            added += 1
+        else:
+            existing += 1
+
+    return added, existing
+
+
+def reset_interrupted_jobs():
+    con = connect()
+
+    con.execute(
+        """
+        UPDATE queue
+        SET status='WAITING',
+            started_at=NULL,
+            error='RECOVERED_AFTER_RESTART'
+        WHERE status='RUNNING'
+        """
+    )
+
+    con.commit()
+    con.close()
+
+
+def next_job():
+    con = connect()
+
+    row = con.execute(
+        """
+        SELECT *
+        FROM queue
+        WHERE status='WAITING'
+          AND (
+              not_before IS NULL
+              OR not_before <= ?
+          )
+        ORDER BY
+            priority ASC,
+            id ASC
+        LIMIT 1
+        """,
+        (now(),),
+    ).fetchone()
+
+    con.close()
+
+    return row
+
+
+def enabled_accounts():
+    con = connect()
+
+    rows = con.execute(
+        """
+        SELECT *
+        FROM accounts
+        WHERE enabled=1
+          AND status NOT IN (
+              'PAUSED',
+              'AUTH_REQUIRED',
+              'VK_CHALLENGE'
+          )
+        ORDER BY
+            COALESCE(
+                last_finished_at,
+                '1970-01-01'
+            ) ASC,
+            id ASC
+        """
+    ).fetchall()
+
+    con.close()
+
+    return rows
+
+
+def account_capability(
+    account_id,
+    group_url,
+):
+    con = connect()
+
+    row = con.execute(
+        """
+        SELECT *
+        FROM account_group_state
+        WHERE account_id=?
+          AND group_url=?
+        """,
+        (
+            account_id,
+            group_url,
+        ),
+    ).fetchone()
+
+    con.close()
+
+    return row
+
+
+def save_capability(
+    account_id,
+    group_url,
+    capability,
+    subscription=None,
+    status=None,
+    error=None,
+):
+    con = connect()
+
+    con.execute(
+        """
+        INSERT INTO account_group_state(
+            account_id,
+            group_url,
+            capability,
+            subscription,
+            last_status,
+            last_error,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+
+        ON CONFLICT(
+            account_id,
+            group_url
+        )
+        DO UPDATE SET
+            capability=
+                excluded.capability,
+            subscription=
+                excluded.subscription,
+            last_status=
+                excluded.last_status,
+            last_error=
+                excluded.last_error,
+            updated_at=
+                excluded.updated_at
+        """,
+        (
+            account_id,
+            group_url,
+            capability,
+            subscription,
+            status,
+            error,
+            now(),
+        ),
+    )
+
+    con.commit()
+    con.close()
+
+
+def choose_account(job):
+    if job["account_id"]:
+        account = get_account(
+            job["account_id"]
+        )
+
+        if (
+            account
+            and account["enabled"]
+            and account["status"]
+                not in {
+                    "PAUSED",
+                    "AUTH_REQUIRED",
+                    "VK_CHALLENGE",
+                }
+        ):
+            return account
+
+        return None
+
+    accounts = enabled_accounts()
+
+    if not accounts:
+        return None
+
+    # Prefer known compatible account.
+    for account in accounts:
+        cap = account_capability(
+            account["id"],
+            job["group_url"],
+        )
+
+        if not cap:
+            continue
+
+        capability = cap[
+            "capability"
+        ]
+
+        requested = job[
+            "requested_flow"
+        ]
+
+        if (
+            requested == "AUTO"
+            and capability
+                in {"SUGGEST", "CREATE"}
+        ):
+            return account
+
+        if capability == requested:
+            return account
+
+    # Unknown capability:
+    # oldest-used enabled account gets
+    # the read/inspect attempt.
+    return accounts[0]
+
+
+def mark_running(
+    queue_id,
+    account_id,
+):
+    con = connect()
+
+    con.execute(
+        """
+        UPDATE queue
+        SET status='RUNNING',
+            account_id=?,
+            attempts=attempts+1,
+            started_at=?,
+            error=NULL
+        WHERE id=?
+        """,
+        (
+            account_id,
+            now(),
+            queue_id,
+        ),
+    )
+
+    con.execute(
+        """
+        UPDATE accounts
+        SET status='BUSY',
+            last_started_at=?,
+            updated_at=?
+        WHERE id=?
+        """,
+        (
+            now(),
+            now(),
+            account_id,
+        ),
+    )
+
+    con.commit()
+    con.close()
+
+
+def finish_account(account_id):
+    con = connect()
+
+    con.execute(
+        """
+        UPDATE accounts
+        SET status=
+            CASE
+                WHEN enabled=1
+                THEN 'READY'
+                ELSE 'PAUSED'
+            END,
+            last_finished_at=?,
+            updated_at=?
+        WHERE id=?
+          AND status='BUSY'
+        """,
+        (
+            now(),
+            now(),
+            account_id,
+        ),
+    )
+
+    con.commit()
+    con.close()
+
+
+def finish_job(
+    queue_id,
+    status,
+    result=None,
+    error=None,
+    selected_flow=None,
+    message_text=None,
+):
+    con = connect()
+
+    con.execute(
+        """
+        UPDATE queue
+        SET status=?,
+            result=?,
+            error=?,
+            selected_flow=
+                COALESCE(?, selected_flow),
+            message_text=
+                COALESCE(?, message_text),
+            finished_at=?
+        WHERE id=?
+        """,
+        (
+            status,
+            result,
+            error,
+            selected_flow,
+            message_text,
+            now(),
+            queue_id,
+        ),
+    )
+
+    con.commit()
+    con.close()
+
+
+def add_history(
+    queue_id,
+    account_id,
+    group_url,
+    flow,
+    message_text,
+    status,
+):
+    con = connect()
+
+    con.execute(
+        """
+        INSERT INTO post_history(
+            queue_id,
+            account_id,
+            group_url,
+            flow,
+            message_text,
+            status,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            queue_id,
+            account_id,
+            group_url,
+            flow,
+            message_text,
+            status,
+            now(),
+        ),
+    )
+
+    con.commit()
+    con.close()
+
+
+def successful_group_before(
+    group_url,
+):
+    con = connect()
+
+    row = con.execute(
+        """
+        SELECT *
+        FROM post_history
+        WHERE group_url=?
+          AND status IN (
+              'CONFIRMED',
+              'PROBABLE',
+              'REMOTE_ATTEMPTED',
+              'UNCERTAIN'
+          )
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (group_url,),
+    ).fetchone()
+
+    con.close()
+
+    return row
+
+
+def queue_stats():
+    con = connect()
+
+    rows = con.execute(
+        """
+        SELECT status, COUNT(*) AS n
+        FROM queue
+        GROUP BY status
+        ORDER BY status
+        """
+    ).fetchall()
+
+    con.close()
+
+    return {
+        row["status"]: row["n"]
+        for row in rows
+    }
+
+
+def account_stats():
+    con = connect()
+
+    rows = con.execute(
+        """
+        SELECT
+            a.*,
+            (
+                SELECT COUNT(*)
+                FROM post_history h
+                WHERE h.account_id=a.id
+            ) AS history_count
+        FROM accounts a
+        ORDER BY a.id
+        """
+    ).fetchall()
+
+    con.close()
+
+    return rows
+
+
+def print_status():
+    print()
+    print("=" * 70)
+    print("VK MULTI ACCOUNT")
+    print("=" * 70)
+
+    print(
+        "MASTER LOCK:",
+        "UNLOCKED"
+        if PRODUCTION_MASTER_UNLOCKED
+        else "LOCKED",
+    )
+
+    print(
+        "REAL VK ACTIONS:",
+        "ENABLED"
+        if REAL_VK_ACTIONS_ENABLED
+        else "DISABLED",
+    )
+
+    print()
+    print("ACCOUNTS")
+
+    accounts = account_stats()
+
+    if not accounts:
+        print("  no accounts")
+
+    for a in accounts:
+        print(
+            f"  #{a['id']} "
+            f"{a['code']} "
+            f"name={a['name']} "
+            f"enabled={bool(a['enabled'])} "
+            f"auth={a['auth_status']} "
+            f"status={a['status']} "
+            f"history={a['history_count']}"
+        )
+
+    print()
+    print("QUEUE")
+
+    stats = queue_stats()
+
+    if not stats:
+        print("  empty")
+
+    for status, count in stats.items():
+        print(
+            f"  {status}: {count}"
+        )
+
+    print("=" * 70)
+
+
+def usage():
+    print(
+        """
+Usage:
+
+  python vk_multi_account.py init
+
+  python vk_multi_account.py status
+
+  python vk_multi_account.py add-account CODE NAME
+
+  python vk_multi_account.py enable ID
+
+  python vk_multi_account.py disable ID
+
+  python vk_multi_account.py auth-ok ID
+
+  python vk_multi_account.py auth-required ID
+
+  python vk_multi_account.py queue URL
+
+  python vk_multi_account.py queue-file
+
+  python vk_multi_account.py reset-running
+"""
+    )
+
+
+def main():
+    init_db()
+
+    if len(sys.argv) < 2:
+        print_status()
+        return
+
+    cmd = sys.argv[1]
+
+    if cmd == "init":
+        print(
+            "DATABASE INITIALIZED:",
+            DB_FILE,
+        )
+        print_status()
+        return
+
+    if cmd == "status":
+        print_status()
+        return
+
+    if cmd == "add-account":
+        if len(sys.argv) < 4:
+            raise SystemExit(
+                "add-account CODE NAME"
+            )
+
+        profile = add_account(
+            sys.argv[2],
+            " ".join(sys.argv[3:]),
+        )
+
+        print(
+            "ACCOUNT CREATED"
+        )
+
+        print(
+            "PROFILE:",
+            profile,
+        )
+
+        return
+
+    if cmd in {
+        "enable",
+        "disable",
+        "auth-ok",
+        "auth-required",
+    }:
+        if len(sys.argv) != 3:
+            raise SystemExit(
+                f"{cmd} ID"
+            )
+
+        account_id = int(
+            sys.argv[2]
+        )
+
+        if cmd == "enable":
+            set_account_enabled(
+                account_id,
+                True,
+            )
+
+        elif cmd == "disable":
+            set_account_enabled(
+                account_id,
+                False,
+            )
+
+        elif cmd == "auth-ok":
+            set_account_auth(
+                account_id,
+                "AUTHORIZED",
+            )
+
+        elif cmd == "auth-required":
+            set_account_auth(
+                account_id,
+                "AUTH_REQUIRED",
+            )
+
+            set_account_status(
+                account_id,
+                "AUTH_REQUIRED",
+            )
+
+        print_status()
+        return
+
+    if cmd == "queue":
+        if len(sys.argv) != 3:
+            raise SystemExit(
+                "queue URL"
+            )
+
+        queue_id, created = (
+            queue_group(
+                sys.argv[2]
+            )
+        )
+
+        print(
+            "QUEUE:",
+            queue_id,
+            "CREATED:"
+            if created
+            else "ALREADY EXISTS",
+        )
+
+        return
+
+    if cmd == "queue-file":
+        added, existing = (
+            queue_groups_file()
+        )
+
+        print(
+            "ADDED:",
+            added,
+        )
+
+        print(
+            "EXISTING:",
+            existing,
+        )
+
+        return
+
+    if cmd == "reset-running":
+        reset_interrupted_jobs()
+
+        print(
+            "INTERRUPTED JOBS RESET"
+        )
+
+        return
+
+    usage()
+    raise SystemExit(2)
+
+
+if __name__ == "__main__":
+    main()
+
+================ production service =====================
+[Unit]
+Description=VKBot Production Posting Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/vkbot
+
+ExecStart=/opt/vkbot/venv/bin/python /opt/vkbot/vk_production_launcher.py
+
+Restart=no
+KillMode=control-group
+TimeoutStopSec=20
+
+Environment=PYTHONUNBUFFERED=1
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

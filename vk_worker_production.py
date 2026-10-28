@@ -1,0 +1,1088 @@
+
+# VKBOT PRODUCTION MASTER LOCK V1
+#
+# This file is the dedicated production worker.
+# Real VK mutations MUST NOT run until this master lock
+# is explicitly changed during the final activation step.
+PRODUCTION_MASTER_UNLOCKED = False
+
+from playwright.sync_api import sync_playwright
+from pathlib import Path
+from urllib.parse import urlparse
+from datetime import datetime, timedelta, date
+import json
+import random
+import re
+from openpyxl import load_workbook
+import time
+
+# ============================================================
+# VK BOT FINAL V2
+# Один worker: подписки, заявки, "Предложить пост", "Создать",
+# state/антидубли, лимиты, паузы, остановка при проверках VK.
+#
+# ВАЖНО:
+# SUGGEST уже проверен end-to-end.
+# CREATE оставлен выключенным до одного контрольного теста:
+# ENABLE_CREATE_SUBMIT = False
+# ============================================================
+
+BASE = Path("/opt/vkbot")
+PROFILE = BASE / "VKBotChromeServer"
+GROUPS_FILE = BASE / "groups.txt"
+STATE_FILE = BASE / "vk_worker_production_state.json"
+LOG_FILE = BASE / "vk_worker_production.log"
+CHROME = "/root/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome"
+
+PHONE = "+79235866030"
+MESSAGES_FILE = BASE / "messages.xlsx"
+
+# ---------- РЕЖИМЫ ----------
+# TEST       -> только тестовая группа, финальная отправка выключена
+# PREPARE    -> реальные группы: только подписки, без постов и заявок
+# PRODUCTION -> реальные группы, но режим жёстко заблокирован ниже
+MODE = "SCAN"
+TEST_GROUP = "https://vk.ru/club240781173"
+
+# Жёсткий замок production. Не менять до отдельного контрольного этапа.
+ENABLE_PRODUCTION = False
+
+# TEST: доходим до финальной кнопки, но НЕ отправляем.
+ENABLE_TEST_SUBMIT = False
+
+# PREPARE: разрешены только подписки.
+ENABLE_SUBSCRIBE = False
+
+# Эти действия в объединённой безопасной версии выключены.
+ENABLE_JOIN_REQUESTS = False
+ENABLE_SUGGEST_SUBMIT = False
+ENABLE_CREATE_SUBMIT = False
+
+# ---------- ЛИМИТЫ ЗА ОДИН ЗАПУСК ----------
+MAX_POSTS = 1
+MAX_NEW_SUBSCRIPTIONS = 5
+MAX_JOIN_REQUESTS = 5
+
+# ---------- ПАУЗЫ ----------
+MIN_GROUP_PAUSE_SEC = 4
+MAX_GROUP_PAUSE_SEC = 8
+MIN_ACTION_PAUSE_SEC = 1.2
+MAX_ACTION_PAUSE_SEC = 2.8
+
+MONTHS_RU = [
+    "января", "февраля", "марта", "апреля", "мая", "июня",
+    "июля", "августа", "сентября", "октября", "ноября", "декабря",
+]
+
+MESSAGE_TEMPLATE = """Привет всем! Водитель, еду {DATES}.
+
+Маршрут следования: Минусинск -> Абакан -> Черногорск -> Красноярск и обратно.
+
+График:
+Минусинск в 7:30
+Абакан в 8:00
+Черногорск в 8:30
+
+Обратно (Красноярск):
+ТРЦ Планета в 14:30
+Аэропорт в 15:00
+
+Берём посылки!
+Опытный водитель, комфортный авто.
+
+Телефон: {PHONE}"""
+
+
+class WorkerStop(RuntimeError):
+    pass
+
+
+def log(msg):
+    line = f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}"
+    print(line)
+    with LOG_FILE.open("a", encoding="utf-8") as f:
+        f.write(line + "\n")
+
+
+def pause(a=MIN_ACTION_PAUSE_SEC, b=MAX_ACTION_PAUSE_SEC):
+    time.sleep(random.uniform(a, b))
+
+
+def generate_dates():
+    ds = [datetime.now() + timedelta(days=i) for i in range(3)]
+    if ds[0].month == ds[-1].month:
+        return ", ".join(str(x.day) for x in ds) + " " + MONTHS_RU[ds[0].month - 1]
+    return (
+        f"{ds[0].day} {MONTHS_RU[ds[0].month - 1]}, "
+        f"{ds[1].day} {MONTHS_RU[ds[1].month - 1]}, "
+        f"{ds[2].day} {MONTHS_RU[ds[2].month - 1]}"
+    )
+
+
+def load_messages():
+    """
+    Load posting templates from messages.xlsx.
+
+    Expected workbook:
+      sheet: first sheet
+      column A header: message
+      rows 2+: message templates
+
+    Empty rows are ignored.
+    """
+    if not MESSAGES_FILE.exists():
+        raise RuntimeError(
+            f"MESSAGES_FILE_NOT_FOUND:{MESSAGES_FILE}"
+        )
+
+    wb = load_workbook(
+        MESSAGES_FILE,
+        read_only=True,
+        data_only=True,
+    )
+
+    try:
+        ws = wb[wb.sheetnames[0]]
+
+        header = ws.cell(1, 1).value
+
+        if str(header).strip().lower() != "message":
+            raise RuntimeError(
+                f"MESSAGES_BAD_HEADER:{header!r}"
+            )
+
+        messages = []
+
+        for row in range(2, ws.max_row + 1):
+            value = ws.cell(row, 1).value
+
+            if value is None:
+                continue
+
+            text = str(value).strip()
+
+            if not text:
+                continue
+
+            messages.append(text)
+
+        if not messages:
+            raise RuntimeError("MESSAGES_EMPTY")
+
+        return messages
+
+    finally:
+        wb.close()
+
+
+def build_message():
+    messages = load_messages()
+
+    template = random.choice(messages)
+
+    return (
+        template
+        .replace("{PHONE}", PHONE)
+        .replace("{DATES}", generate_dates())
+    )
+
+
+
+def normalize_vk_url(raw):
+    raw = raw.strip()
+    if not raw:
+        return None
+    if "://" not in raw:
+        raw = "https://" + raw
+
+    parsed = urlparse(raw)
+    host = parsed.netloc.lower().split(":")[0]
+
+    if host in {"vk.com", "www.vk.com", "vk.ru", "www.vk.ru"}:
+        host = "vk.ru"
+
+    path = "/" + parsed.path.strip("/")
+    if path == "/":
+        return None
+
+    return f"https://{host}{path}"
+
+
+def load_groups():
+    if MODE == "TEST":
+        return [TEST_GROUP]
+
+    if MODE == "PRODUCTION" and not ENABLE_PRODUCTION:
+        raise RuntimeError("PRODUCTION_LOCKED")
+
+    if MODE not in {"SCAN", "PREPARE", "PRODUCTION"}:
+        raise RuntimeError(f"UNKNOWN_MODE:{MODE}")
+
+    if not GROUPS_FILE.exists():
+        raise RuntimeError(f"Нет файла {GROUPS_FILE}")
+
+    out, seen = [], set()
+
+    for raw in GROUPS_FILE.read_text(encoding="utf-8-sig").splitlines():
+        url = normalize_vk_url(raw)
+        if not url:
+            continue
+
+        key = url.lower()
+        if key in seen:
+            continue
+
+        seen.add(key)
+        out.append(url)
+
+    return out
+
+def load_state():
+    if not STATE_FILE.exists():
+        return {"groups": {}, "runs": []}
+    try:
+        d = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        if not isinstance(d, dict):
+            raise ValueError
+        d.setdefault("groups", {})
+        d.setdefault("runs", [])
+        return d
+    except Exception:
+        raise RuntimeError("STATE повреждён. Worker остановлен для защиты от дублей.")
+
+
+def save_state(state):
+    tmp = STATE_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(STATE_FILE)
+
+
+def update_group(state, url, status, **extra):
+    old = state["groups"].get(url, {})
+    rec = dict(old)
+    rec.update(extra)
+    rec["status"] = status
+    rec["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    state["groups"][url] = rec
+    save_state(state)
+    log(f"STATE {url} -> {status}")
+
+
+def visible(locator):
+    out = []
+    try:
+        n = locator.count()
+    except Exception:
+        return out
+    for i in range(n):
+        try:
+            x = locator.nth(i)
+            if x.is_visible():
+                out.append(x)
+        except Exception:
+            pass
+    return out
+
+
+def exact(page, text):
+    return visible(page.get_by_text(text, exact=True))
+
+
+def detect_block(page):
+    u = page.url.lower()
+    if "challenge" in u:
+        return "VK_CHALLENGE"
+    markers = [
+        "Проверяем, что вы не робот",
+        "Подтвердите, что вы не робот",
+        "Подтвердите вход",
+        "Слишком много попыток",
+    ]
+    for m in markers:
+        try:
+            if visible(page.get_by_text(m, exact=False)):
+                return "VK_VERIFICATION"
+        except Exception:
+            pass
+    return None
+
+
+def assert_no_block(page):
+    b = detect_block(page)
+    if b:
+        raise WorkerStop(b)
+
+
+def scan_entries(page):
+    """Ищем управляющие элементы по странице без кликов."""
+    result = {
+        "suggest": None,
+        "create": None,
+        "subscribe": None,
+        "join": None,
+        "subscribed": False,
+    }
+
+    page.evaluate("window.scrollTo(0,0)")
+    pause(.5, .9)
+
+    for step in range(16):
+        assert_no_block(page)
+
+        sug = exact(page, "Предложить пост")
+        cre = exact(page, "Создать")
+        sub = exact(page, "Подписаться")
+        joi = exact(page, "Подать заявку")
+        yes = exact(page, "Вы подписаны")
+
+        if len(sug) == 1 and result["suggest"] is None:
+            result["suggest"] = sug[0]
+        if len(cre) == 1 and result["create"] is None:
+            result["create"] = cre[0]
+        if len(sub) == 1 and result["subscribe"] is None:
+            result["subscribe"] = sub[0]
+        if len(joi) == 1 and result["join"] is None:
+            result["join"] = joi[0]
+        if yes:
+            result["subscribed"] = True
+
+        # Предложение поста имеет приоритет.
+        if result["suggest"] is not None:
+            break
+
+        page.evaluate("window.scrollBy(0,300)")
+        pause(.65, 1.05)
+
+    return result
+
+
+def unique_editor(page):
+    editors = visible(page.locator('[role="textbox"][contenteditable="true"]'))
+    if len(editors) != 1:
+        raise RuntimeError(f"EDITOR_NOT_UNIQUE:{len(editors)}")
+    return editors[0]
+
+
+def open_post_editor(page, entry, flow):
+    entry.click(timeout=10000)
+    pause(1.4, 2.0)
+    assert_no_block(page)
+
+    if len(exact(page, "Новый пост")) != 1:
+        raise RuntimeError(f"{flow}_NEW_POST_NOT_UNIQUE")
+
+    return unique_editor(page)
+
+
+def fill_and_next(page, editor, text):
+    editor.fill(text)
+    if editor.inner_text().strip() != text.strip():
+        raise RuntimeError("EDITOR_TEXT_VERIFY_FAILED")
+    log("EDITOR TEXT VERIFIED")
+
+    nxt = exact(page, "Далее")
+    if len(nxt) != 1:
+        raise RuntimeError(f"NEXT_NOT_UNIQUE:{len(nxt)}")
+
+    btn = nxt[0].locator(
+        "xpath=ancestor-or-self::*[self::button or @role='button'][1]"
+    )
+    if btn.count() != 1:
+        raise RuntimeError("NEXT_BUTTON_NOT_UNIQUE")
+
+    btn.click(timeout=10000)
+    pause(1.8, 2.5)
+    assert_no_block(page)
+    log("NEXT CLICKED")
+
+
+def dialog_buttons(page, names):
+    found = []
+    for dialog in visible(page.locator('[role="dialog"]')):
+        for name in names:
+            found.extend(
+                visible(dialog.get_by_role("button", name=name, exact=True))
+            )
+    return found
+
+
+def final_button_suggest(page):
+    items = dialog_buttons(page, ["Предложить пост"])
+    if len(items) != 1:
+        raise RuntimeError(f"SUGGEST_FINAL_NOT_UNIQUE:{len(items)}")
+    return items[0]
+
+
+def final_button_create(page):
+    # VK может называть финальную кнопку по-разному.
+    # Строго требуем ровно одну подходящую кнопку.
+    items = dialog_buttons(page, ["Опубликовать", "Создать", "Разместить", "Отправить"])
+    unique = []
+    seen = set()
+    for x in items:
+        try:
+            key = x.evaluate("(e)=>e.outerHTML")
+        except Exception:
+            key = str(id(x))
+        if key not in seen:
+            seen.add(key)
+            unique.append(x)
+    if len(unique) != 1:
+        raise RuntimeError(f"CREATE_FINAL_NOT_UNIQUE:{len(unique)}")
+    return unique[0]
+
+
+def inspect_submit(page, flow):
+    pause(2.5, 3.5)
+    assert_no_block(page)
+
+    # UI-тексты не подтверждают публикацию и авторство.
+    # Для SUGGEST различаем признаки модерации и неоднозначные надписи.
+    suggest_markers = (
+        "Пост предложен", "Запись предложена", "Предложенный пост",
+        "Предложенные посты",
+    )
+    create_markers = ("Запись опубликована", "Пост опубликован")
+    markers = suggest_markers if flow == "SUGGEST" else create_markers
+    for m in markers:
+        try:
+            if visible(page.get_by_text(m, exact=True)):
+                if flow == "SUGGEST":
+                    return "PENDING_MODERATION", f"UI_MARKER:{m}"
+                return "CONFIRMED", f"UI_MARKER:{m}"
+        except Exception:
+            pass
+
+    # Как в успешном тесте: финальный диалог исчез.
+    if flow == "SUGGEST":
+        try:
+            if not dialog_buttons(page, ["Предложить пост"]):
+                return "PROBABLE", "FINAL_DIALOG_DISAPPEARED"
+        except Exception:
+            pass
+
+    return "UNCERTAIN", "NO_CONFIRMATION_MARKER"
+
+
+
+def collect_post_candidates(page):
+    """Собирает ссылки-кандидаты, не подтверждая публикацию."""
+    from vk_post_identity import extract_post_identity
+
+    candidates = {}
+    try:
+        hrefs = page.locator('a[href*="wall"]').evaluate_all(
+            "(nodes) => nodes.map(node => node.href).slice(0, 100)"
+        )
+    except Exception:
+        return []
+
+    for href in hrefs:
+        identity = extract_post_identity(href)
+        if identity:
+            candidates[identity["vk_post_id"]] = identity
+
+    return list(candidates.values())
+
+
+
+def compare_post_candidates(before, after):
+    """Выделяет новые ссылки без подтверждения авторства."""
+    from vk_post_identity import extract_post_identity
+
+    def identities(items):
+        result = {}
+        for item in items or []:
+            if not isinstance(item, dict):
+                continue
+            identity = extract_post_identity(item.get("post_url"))
+            if identity:
+                result[identity["vk_post_id"]] = identity
+        return result
+
+    old = identities(before)
+    new = identities(after)
+
+    return [
+        {"post_url": item["post_url"], "vk_post_id": post_id}
+        for post_id, item in new.items()
+        if post_id not in old
+    ]
+
+
+def remote_submit(page, state, url, text, flow, button):
+    # Критическая защита: REMOTE_ATTEMPTED пишется ДО клика.
+    update_group(state, url, "INTENT", flow=flow, message=text)
+    update_group(state, url, "REMOTE_ATTEMPTED", flow=flow, message=text)
+    log(f"{flow}: REMOTE SUBMIT ONE ATTEMPT")
+
+    # Снимок ссылок ДО попытки публикации.
+    # Ошибка чтения не должна приводить к удалению записей.
+    before_candidates = collect_post_candidates(page)
+
+    from vk_network_observer import VKNetworkObserver
+    # Определяем владельца сообщества для проверки запроса.
+    # Неизвестный адрес не допускает подтверждения кандидатов.
+    group_match = re.search(
+        r"(?:club|public)([0-9]+)(?:/|$)",
+        str(url),
+    )
+    expected_owner_id = (
+        -int(group_match.group(1))
+        if group_match
+        else None
+    )
+
+    # Контекст используется только для сопоставления событий.
+    # Сам по себе он не подтверждает авторство публикации.
+    import os as _observer_os
+
+    _queue_id = _observer_os.environ.get("VKBOT_QUEUE_ID")
+    _account_id = _observer_os.environ.get("VKBOT_ACCOUNT_ID")
+
+    observer = VKNetworkObserver(
+        expected_owner_id=expected_owner_id,
+        expected_text=text,
+        queue_id=int(_queue_id) if _queue_id and _queue_id.isdecimal() else None,
+        account_id=int(_account_id) if _account_id and _account_id.isdecimal() else None,
+    )
+
+    # Наблюдаем только за сетевыми ответами текущей попытки.
+    page.on("request", observer.handle_request)
+    page.on("response", observer.handle_response)
+
+    try:
+        button.click(timeout=10000, no_wait_after=True)
+    except Exception as exc:
+        page.remove_listener("response", observer.handle_response)
+        page.remove_listener("request", observer.handle_request)
+        update_group(
+            state, url, "UNCERTAIN",
+            flow=flow, message=text, error=repr(exc)
+        )
+        return "REMOTE_ATTEMPT"
+
+    try:
+        result, reason = inspect_submit(page, flow)
+    finally:
+        page.remove_listener("response", observer.handle_response)
+        page.remove_listener("request", observer.handle_request)
+
+    network_summary = observer.summary()
+
+    # Идентификаторы из ответов VK API — только кандидаты.
+    # Они ещё не связаны достоверно с конкретным заданием.
+    network_post_candidates = sorted({
+        event["post_id"]
+        for event in observer.events
+        if event.get("post_id_source") == "VK_API_WALL_POST"
+        and type(event.get("post_id")) is int
+        and event["post_id"] > 0
+    })
+
+    log(
+        f"VK_NETWORK_OBSERVER responses={network_summary['responses_seen']} "
+        f"verified={network_summary['publication_verified']}"
+    )
+
+    # Сравнение ссылок ДО и ПОСЛЕ отправки.
+    # Новые ссылки НЕ являются доказательством авторства.
+    after_candidates = collect_post_candidates(page)
+
+    candidates = compare_post_candidates(
+        before_candidates,
+        after_candidates
+    )
+
+    update_group(
+        state, url, result,
+        flow=flow, message=text, reason=reason,
+        post_candidates=candidates,
+        network_post_candidates=network_post_candidates,
+        network_publication_verified=False
+    )
+    log(f"{flow}: RESULT {result} ({reason})")
+    return "REMOTE_ATTEMPT"
+
+
+def do_suggest(page, state, url, entry, text):
+    editor = open_post_editor(page, entry, "SUGGEST")
+    fill_and_next(page, editor, text)
+    btn = final_button_suggest(page)
+    log("SUGGEST FINAL BUTTON UNIQUE")
+
+    if MODE == "TEST":
+        update_group(
+            state, url, "TEST_READY_NOT_SUBMITTED",
+            flow="SUGGEST", message=text
+        )
+        print("=" * 72)
+        print("REMOTE COMMIT BOUNDARY REACHED")
+        print("TEST GROUP:", url)
+        print("FINAL SUBMIT:", "ENABLED" if ENABLE_TEST_SUBMIT else "DISABLED")
+        print("=" * 72)
+
+        if not ENABLE_TEST_SUBMIT:
+            log("TEST submit disabled: final click NOT performed")
+            return "SKIP"
+
+        return remote_submit(page, state, url, text, "SUGGEST", btn)
+
+    if MODE == "PRODUCTION":
+        if not ENABLE_PRODUCTION:
+            raise RuntimeError("PRODUCTION_LOCKED")
+        if not ENABLE_SUGGEST_SUBMIT:
+            update_group(state, url, "SUGGEST_DISABLED")
+            return "SKIP"
+        return remote_submit(page, state, url, text, "SUGGEST", btn)
+
+    update_group(state, url, "SUGGEST_SKIPPED_IN_PREPARE")
+    return "SKIP"
+
+def do_create(page, state, url, entry, text):
+    editor = open_post_editor(page, entry, "CREATE")
+    fill_and_next(page, editor, text)
+
+    # Даже при выключенном submit мы доходим до финального экрана:
+    # так можно безопасно проверить интерфейс.
+    btn = final_button_create(page)
+    log("CREATE FINAL BUTTON UNIQUE")
+
+    if not ENABLE_CREATE_SUBMIT:
+        update_group(
+            state, url, "CREATE_READY_NOT_SUBMITTED",
+            flow="CREATE",
+            message=text
+        )
+        log("CREATE submit disabled: final click NOT performed")
+        return "SKIP"
+
+    return remote_submit(page, state, url, text, "CREATE", btn)
+
+
+def click_membership(page, state, url, kind, button):
+    status_before = "SUBSCRIBE_INTENT" if kind == "SUBSCRIBE" else "JOIN_REQUEST_INTENT"
+    status_after = "SUBSCRIBE_CLICKED" if kind == "SUBSCRIBE" else "JOIN_REQUEST_SENT"
+
+    update_group(state, url, status_before)
+    button.click(timeout=10000)
+    pause(1.8, 2.8)
+    assert_no_block(page)
+    update_group(state, url, status_after)
+    return status_after
+
+
+def read_subscription_state(page):
+    """
+    Strong signals only:
+    SUBSCRIBED     -> 'Вы подписаны' / 'Отписаться'
+    NOT_SUBSCRIBED -> 'Подписаться'
+    UNKNOWN        -> no safe conclusion
+    """
+    page.evaluate("window.scrollTo(0,0)")
+    pause(.5, .8)
+
+    saw_subscribe = False
+
+    for _ in range(16):
+        assert_no_block(page)
+
+        if exact(page, "Вы подписаны") or exact(page, "Отписаться"):
+            return "SUBSCRIBED"
+
+        if exact(page, "Подписаться"):
+            saw_subscribe = True
+
+        page.evaluate("window.scrollBy(0,300)")
+        pause(.45, .75)
+
+    return "NOT_SUBSCRIBED" if saw_subscribe else "UNKNOWN"
+
+
+def find_unique_subscribe_button(page):
+    page.evaluate("window.scrollTo(0,0)")
+    pause(.4, .7)
+
+    for _ in range(16):
+        assert_no_block(page)
+        items = exact(page, "Подписаться")
+
+        if len(items) == 1:
+            return items[0]
+
+        if len(items) > 1:
+            raise RuntimeError(f"SUBSCRIBE_NOT_UNIQUE:{len(items)}")
+
+        page.evaluate("window.scrollBy(0,300)")
+        pause(.45, .75)
+
+    return None
+
+
+def process_prepare_group(page, state, url, counters):
+    log("=" * 72)
+    log(f"PREPARE OPEN {url}")
+
+    page.goto(url, wait_until="domcontentloaded", timeout=60000)
+    pause(2.5, 3.5)
+    assert_no_block(page)
+
+    before = read_subscription_state(page)
+    log(f"SUBSCRIPTION BEFORE -> {before}")
+
+    if before == "SUBSCRIBED":
+        update_group(state, url, "SUBSCRIBED_CONFIRMED")
+        return "SKIP"
+
+    if before != "NOT_SUBSCRIBED":
+        update_group(state, url, "VERIFY_UNCERTAIN")
+        return "SKIP"
+
+    if counters["subs"] >= MAX_NEW_SUBSCRIPTIONS:
+        update_group(state, url, "SUBSCRIBE_LIMIT_REACHED")
+        return "SKIP"
+
+    button = find_unique_subscribe_button(page)
+    if button is None:
+        update_group(state, url, "SUBSCRIBE_FAILED", reason="BUTTON_NOT_FOUND")
+        return "SKIP"
+
+    update_group(state, url, "SUBSCRIBE_INTENT")
+
+    try:
+        button.click(timeout=10000)
+    except Exception as exc:
+        update_group(state, url, "SUBSCRIBE_FAILED", error=repr(exc))
+        return "SKIP"
+
+    # Click happened: count it immediately; never retry automatically this run.
+    counters["subs"] += 1
+    update_group(state, url, "SUBSCRIBE_CLICKED_UNCERTAIN")
+    pause(2.0, 3.0)
+
+    after = read_subscription_state(page)
+    log(f"SUBSCRIPTION AFTER -> {after}")
+
+    if after == "SUBSCRIBED":
+        update_group(state, url, "SUBSCRIBED_CONFIRMED")
+    else:
+        # One read-only reload verification; no second click.
+        page.reload(wait_until="domcontentloaded", timeout=60000)
+        pause(2.0, 3.0)
+        verify = read_subscription_state(page)
+        log(f"SUBSCRIPTION VERIFY -> {verify}")
+
+        if verify == "SUBSCRIBED":
+            update_group(state, url, "SUBSCRIBED_CONFIRMED")
+        else:
+            update_group(state, url, "SUBSCRIBE_CLICKED_UNCERTAIN",
+                         verify=verify)
+
+    return "SKIP"
+
+
+def process_group(page, state, url, text, counters):
+    old = state["groups"].get(url, {}).get("status")
+
+    # После возможного remote commit эту группу автоматически не трогаем.
+    if old in {"REMOTE_ATTEMPTED", "CONFIRMED", "PENDING_MODERATION", "PROBABLE", "UNCERTAIN"}:
+        log(f"SKIP remote-state {url}: {old}")
+        return "SKIP"
+
+    log("=" * 72)
+    log(f"OPEN {url}")
+    page.goto(url, wait_until="domcontentloaded", timeout=60000)
+    pause(2.8, 4.0)
+    assert_no_block(page)
+
+    title = page.title()
+    log(f"FINAL URL {page.url}")
+    log(f"TITLE {title}")
+
+    if "deleted" in title.lower():
+        update_group(state, url, "DELETED")
+        return "SKIP"
+
+    entries = scan_entries(page)
+
+    # 1. Уже доступна публикация.
+    if entries["suggest"] is not None:
+        return do_suggest(page, state, url, entries["suggest"], text)
+
+    # 2. CREATE.
+    if entries["create"] is not None:
+        return do_create(page, state, url, entries["create"], text)
+
+    # 3. Закрытая группа — заявка.
+    if entries["join"] is not None:
+        if old == "JOIN_REQUEST_SENT":
+            log("JOIN request already sent earlier")
+            return "SKIP"
+
+        if not ENABLE_JOIN_REQUESTS:
+            update_group(state, url, "JOIN_REQUEST_REQUIRED")
+            return "SKIP"
+
+        if counters["joins"] >= MAX_JOIN_REQUESTS:
+            update_group(state, url, "JOIN_LIMIT_REACHED")
+            return "SKIP"
+
+        click_membership(page, state, url, "JOIN", entries["join"])
+        counters["joins"] += 1
+        return "SKIP"
+
+    # 4. Открытая группа — подписка.
+    if entries["subscribe"] is not None:
+        if old == "SUBSCRIBE_CLICKED":
+            log("Subscribe already clicked earlier")
+            return "SKIP"
+
+        if not ENABLE_SUBSCRIBE:
+            update_group(state, url, "SUBSCRIBE_REQUIRED")
+            return "SKIP"
+
+        if counters["subs"] >= MAX_NEW_SUBSCRIPTIONS:
+            update_group(state, url, "SUBSCRIBE_LIMIT_REACHED")
+            return "SKIP"
+
+        click_membership(page, state, url, "SUBSCRIBE", entries["subscribe"])
+        counters["subs"] += 1
+        return "SKIP"
+
+    update_group(state, url, "NO_SUPPORTED_ACTION")
+    return "SKIP"
+
+
+
+def assert_runtime_safety():
+    if MODE == "PRODUCTION" and not ENABLE_PRODUCTION:
+        raise RuntimeError("PRODUCTION_LOCKED")
+    if MODE == "PRODUCTION" and ENABLE_CREATE_SUBMIT:
+        raise RuntimeError(
+            "CREATE_PRODUCTION_NOT_APPROVED: CREATE has only passed dry-run"
+        )
+
+def main():
+    assert_runtime_safety()
+    if MODE == "PRODUCTION" and not ENABLE_PRODUCTION:
+        raise RuntimeError(
+            "PRODUCTION_LOCKED: real-group posting is disabled."
+        )
+
+    groups = load_groups()
+    state = load_state()
+    import os
+
+    queue_id = os.environ.get("VKBOT_QUEUE_ID")
+
+    if queue_id:
+        import vk_multi_account as multi
+
+        account_id = os.environ.get("VKBOT_ACCOUNT_ID")
+        group_url = os.environ.get("VKBOT_SINGLE_GROUP")
+
+        if not queue_id.isdecimal() or not account_id or not group_url:
+            raise RuntimeError("INVALID_QUEUE_CONTEXT")
+
+        with multi.connect() as db:
+            row = db.execute(
+                """
+                SELECT message_text
+                FROM queue
+                WHERE id=?
+                  AND account_id=?
+                  AND group_url=?
+                  AND status='RUNNING'
+                """,
+                (int(queue_id), int(account_id), group_url),
+            ).fetchone()
+
+            if row is None:
+                raise RuntimeError("QUEUE_CONTEXT_NOT_FOUND")
+
+            if row["message_text"]:
+                text = row["message_text"]
+            else:
+                text = build_message()
+                cursor = db.execute(
+                    """
+                    UPDATE queue
+                    SET message_text=?
+                    WHERE id=?
+                      AND account_id=?
+                      AND group_url=?
+                      AND status='RUNNING'
+                      AND message_text IS NULL
+                    """,
+                    (text, int(queue_id), int(account_id), group_url),
+                )
+
+                if cursor.rowcount != 1:
+                    raise RuntimeError("QUEUE_TEXT_SAVE_FAILED")
+
+                db.commit()
+    else:
+        text = build_message()
+
+    counters = {"posts": 0, "subs": 0, "joins": 0}
+
+    log("=" * 72)
+    log(f"VK WORKER UNIFIED START MODE={MODE}")
+    log(f"GROUPS={len(groups)}")
+    log(
+        f"FLAGS production={ENABLE_PRODUCTION} "
+        f"test_submit={ENABLE_TEST_SUBMIT} "
+        f"subscribe={ENABLE_SUBSCRIBE}"
+    )
+
+    print()
+    print("=" * 72)
+    print("VK WORKER UNIFIED")
+    print("MODE:", MODE)
+    print("PRODUCTION:", "ENABLED" if ENABLE_PRODUCTION else "LOCKED")
+    print("TEST FINAL SUBMIT:", "ENABLED" if ENABLE_TEST_SUBMIT else "DISABLED")
+    print("GROUPS:", len(groups))
+    print("=" * 72)
+
+    print("\nFINAL MESSAGE:\n" + "-" * 60)
+    print(text)
+    print("-" * 60 + "\n")
+
+    ctx = None
+
+    try:
+        with sync_playwright() as p:
+            ctx = p.chromium.launch_persistent_context(
+                user_data_dir=str(PROFILE),
+                executable_path=CHROME,
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                ],
+                viewport=None,
+                timeout=120000,
+            )
+
+            page = ctx.pages[0] if ctx.pages else ctx.new_page()
+
+            for i, url in enumerate(groups, 1):
+                log(f"GROUP {i}/{len(groups)}")
+
+                try:
+                    if MODE == "SCAN":
+                        page.goto(url, wait_until="domcontentloaded", timeout=60000)
+                        pause(2.0, 3.0)
+                        assert_no_block(page)
+                        entries = scan_entries(page)
+                        sub_state = read_subscription_state(page)
+                        update_group(
+                            state,
+                            url,
+                            "SCAN_ONLY",
+                            subscription=sub_state,
+                            create=bool(entries.get("create")),
+                            suggest=bool(entries.get("suggest")),
+                        )
+                        log(
+                            f"SCAN {url} subscription={sub_state} "
+                            f"create={bool(entries.get('create'))} "
+                            f"suggest={bool(entries.get('suggest'))}"
+                        )
+
+                    elif MODE == "PREPARE":
+                        if not ENABLE_SUBSCRIBE:
+                            raise RuntimeError("PREPARE_SUBSCRIBE_DISABLED")
+
+                        process_prepare_group(
+                            page, state, url, counters
+                        )
+
+                        if counters["subs"] >= MAX_NEW_SUBSCRIPTIONS:
+                            log("STOP: subscription limit reached")
+                            break
+
+                    elif MODE == "TEST":
+                        # TEST is hard-scoped by load_groups() to TEST_GROUP.
+                        result = process_group(
+                            page, state, url, text, counters
+                        )
+
+                        if result == "REMOTE_ATTEMPT":
+                            counters["posts"] += 1
+
+                        # Exactly one test group.
+                        break
+
+                    elif MODE == "PRODUCTION":
+                        if not ENABLE_PRODUCTION:
+                            raise RuntimeError("PRODUCTION_LOCKED")
+
+                        result = process_group(
+                            page, state, url, text, counters
+                        )
+
+                        if result == "REMOTE_ATTEMPT":
+                            counters["posts"] += 1
+                            log("STOP after remote post attempt")
+                            break
+
+                    else:
+                        raise RuntimeError(f"UNKNOWN_MODE:{MODE}")
+
+                except WorkerStop as exc:
+                    log(f"CRITICAL VK STOP: {exc}")
+                    break
+
+                except Exception as exc:
+                    log(f"ERROR {url}: {repr(exc)}")
+
+                    current = state["groups"].get(url, {}).get("status")
+
+                    if current == "REMOTE_ATTEMPTED":
+                        update_group(
+                            state, url, "UNCERTAIN",
+                            error=repr(exc), message=text
+                        )
+                        counters["posts"] += 1
+                        log("STOP: error after remote attempt; NO RETRY")
+                        break
+
+                    update_group(state, url, "ERROR", error=repr(exc))
+
+                pause(MIN_GROUP_PAUSE_SEC, MAX_GROUP_PAUSE_SEC)
+
+            state["runs"].append({
+                "mode": MODE,
+                "finished_at": datetime.now().isoformat(timespec="seconds"),
+                "posts": counters["posts"],
+                "subscriptions": counters["subs"],
+                "join_requests": counters["joins"],
+            })
+            state["runs"] = state["runs"][-50:]
+            save_state(state)
+
+            print()
+            print("=" * 72)
+            print("VK WORKER UNIFIED FINISHED")
+            print("MODE:", MODE)
+            print("POST ATTEMPTS:", counters["posts"])
+            print("NEW SUBSCRIPTIONS:", counters["subs"])
+            print("JOIN REQUESTS:", counters["joins"])
+            print("STATE:", STATE_FILE)
+            print("LOG:", LOG_FILE)
+            print("=" * 72)
+
+    except KeyboardInterrupt:
+        log("STOPPED BY USER (Ctrl+C)")
+
+    finally:
+        if ctx is not None:
+            try:
+                ctx.close()
+            except Exception as exc:
+                pass
+
+
+if __name__ == "__main__":
+    main()
