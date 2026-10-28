@@ -1,0 +1,129 @@
+=== VERA VK POSTING: PROJECT AUDIT ===
+PRODUCTION_STOP: PRESENT
+
+=== PYTHON MODULES ===
+account_lifecycle_lock.py SIZE: 2101 FUNCTIONS: normalize_account_user_id, _ensure_lock_dir, _lock_path, account_lifecycle_shared, account_lifecycle_exclusive
+add_phones.py SIZE: 868 FUNCTIONS: 
+auth_accounts.py SIZE: 1500 FUNCTIONS: 
+auth_one_account.py SIZE: 4236 FUNCTIONS: load_config, find_account, captcha_handler, auth_handler, main
+auto_auth.py SIZE: 2863 FUNCTIONS: auth_account
+auto_auth_v2.py SIZE: 4355 FUNCTIONS: auth_account
+backup_daily.py SIZE: 1243 FUNCTIONS: 
+bot.py SIZE: 43106 FUNCTIONS: atomic_write_json, load_json_file, load_config, load_settings, load_groups, load_messages, load_published_posts, save_published_posts, load_stats, save_stats, load_state, save_state, add_error_stat, set_account_status, set_group_status, increment_success, check_pause, smart_sleep, create_vk_api, vk_call_with_retry, check_post_status, generate_dates, account_key, is_account_in_cooldown, set_account_cooldown, is_account_runtime_ready, get_next_available_account, resolve_token_for_post, cleanup_deleted_posts, check_and_delete_old_posts
+bot_backup_2026-09-07.py SIZE: 9665 FUNCTIONS: load_config, load_settings, load_groups, load_messages, load_published_posts, save_published_posts, load_stats, save_stats, check_pause, smart_sleep, check_post_status, generate_dates, check_and_delete_old_posts, main
+bot_before_v2_2026-09-07.py SIZE: 9665 FUNCTIONS: load_config, load_settings, load_groups, load_messages, load_published_posts, save_published_posts, load_stats, save_stats, check_pause, smart_sleep, check_post_status, generate_dates, check_and_delete_old_posts, main
+bot_v2.py SIZE: 28057 FUNCTIONS: atomic_write_json, load_json_file, load_config, load_settings, load_groups, load_messages, load_published_posts, save_published_posts, load_stats, save_stats, load_state, save_state, add_error_stat, set_account_status, set_group_status, increment_success, check_pause, smart_sleep, create_vk_api, vk_call_with_retry, check_post_status, generate_dates, account_key, is_account_in_cooldown, set_account_cooldown, get_next_available_account, resolve_token_for_post, cleanup_deleted_posts, check_and_delete_old_posts, save_new_post
+create_excel.py SIZE: 592 FUNCTIONS: 
+get_group_ids.py SIZE: 1700 FUNCTIONS: 
+get_ids.py SIZE: 5851 FUNCTIONS: 
+install_step524.py SIZE: 1294 FUNCTIONS: 
+install_step530.py SIZE: 1045 FUNCTIONS: 
+install_step544.py SIZE: 1081 FUNCTIONS: 
+install_vk_account_delete.py SIZE: 7329 FUNCTIONS: 
+install_vk_identity_v2.py SIZE: 3612 FUNCTIONS: 
+install_vk_identity_v3.py SIZE: 4457 FUNCTIONS: 
+install_vk_identity_v4.py SIZE: 2965 FUNCTIONS: 
+install_vk_token.py SIZE: 5561 FUNCTIONS: normalize_user_id, load_config, save_config_atomic, install_token, main
+offline_test_step510.py SIZE: 1600 FUNCTIONS: 
+offline_test_step524.py SIZE: 1233 FUNCTIONS: 
+offline_test_step530.py SIZE: 1593 FUNCTIONS: 
+offline_test_step544.py SIZE: 1670 FUNCTIONS: 
+posts_transaction_lock.py SIZE: 1307 FUNCTIONS: _open_lock_file, published_posts_shared, published_posts_exclusive
+publication_journal.py SIZE: 12069 FUNCTIONS: utc_now, content_sha256, new_operation_id, _fsync_directory, _ensure_private_file, journal_exclusive, journal_shared, _validate_basic_event, _validate_operation_history, _load_events_unlocked, load_events, latest_by_operation, unresolved_operations, append_event, make_intent, make_confirmed, make_uncertain, make_failed, make_committed
+smart_auth.py SIZE: 3498 FUNCTIONS: auth_with_captcha_and_2fa
+telegram_admin.py SIZE: 154719 FUNCTIONS: load_config_fresh, save_config_atomic, mutate_config_locked, _normalize_vk_user_id, _find_account_index_by_user_id, validate_account_for_enable, get_pending_posts_for_account, tx_add_vk_account_disabled, tx_disable_vk_account, tx_set_vk_account_enabled, tx_delete_vk_account, get_vk_accounts, account_label, show_accounts_menu, show_account_card, _vk_worker_existing, _vk_worker_load_json, _vk_worker_rows, vk_worker_status_text, vk_worker_log_summary, vk_worker_log_text, vk_worker_write_command, _vk_systemctl_is_active, _vk_systemctl_action, vk_production_running, vk_scan_running, vk_production_start, vk_production_stop, vk_production_status_text, vk_multi_connect
+telegram_admin_backup_2026-09-07.py SIZE: 20433 FUNCTIONS: load_settings, save_settings, load_stats, load_groups, load_messages, save_messages, start, show_main_menu, button_handler, message_handler, main
+telegram_admin_before_v2_2026-09-07.py SIZE: 20433 FUNCTIONS: load_settings, save_settings, load_stats, load_groups, load_messages, save_messages, start, show_main_menu, button_handler, message_handler, main
+telegram_admin_v2.py SIZE: 25722 FUNCTIONS: atomic_write_json, load_json, load_config, is_admin, load_settings, save_settings, load_stats, load_state, load_posts, load_groups, load_messages, save_messages, bot_process_info, bot_is_active, restart_bot_service, status_label, account_summary, main_dashboard_text, main_keyboard, safe_edit, start, cancel, button_handler, message_handler, error_handler, main
+vk_account_auth.py SIZE: 8889 FUNCTIONS: get_account, set_auth, verified_self_id, confirm_identity, main
+vk_account_auth_service.py SIZE: 1938 FUNCTIONS: log, main
+vk_auth_gateway.py SIZE: 8721 FUNCTIONS: valid_token, authorized, login, index, websocket_test, health, vnc_websocket, novnc_files, issue_auth_link
+vk_browser.py SIZE: 1640 FUNCTIONS: main
+vk_delete_guard.py SIZE: 2699 FUNCTIONS: assess_delete_permission
+vk_delete_permission.py SIZE: 752 FUNCTIONS: check_delete_permission
+vk_deletion_review.py SIZE: 3769 FUNCTIONS: collect_due, send_once
+vk_manual_auth.py SIZE: 1096 FUNCTIONS: 
+vk_moderation_api_reader.py SIZE: 1994 FUNCTIONS: read_vk_post
+vk_moderation_browser_reader.py SIZE: 3264 FUNCTIONS: require_safe_mode, parse_post_url, get_original_profile_paths, validate_isolated_profile, read_post
+vk_moderation_matcher.py SIZE: 1430 FUNCTIONS: match_moderated_post
+vk_moderation_monitor.py SIZE: 3054 FUNCTIONS: inspect_registry, main, evaluate_candidate
+vk_moderation_notifier.py SIZE: 5763 FUNCTIONS: require_safe_mode, load_telegram_config, connect_database, already_delivered, send_notification
+vk_moderation_pipeline.py SIZE: 3400 FUNCTIONS: require_safe_mode, make_event_key, prepare_notification, collect_notifications, fetch_candidate
+vk_moderation_wall_reader.py SIZE: 1561 FUNCTIONS: extract_wall_candidates
+vk_multi_account.py SIZE: 25010 FUNCTIONS: now, normalize_vk_url, connect, init_db, get_setting, setting_bool, set_setting, assert_global_safety, safe_code, add_account, list_accounts, get_account, set_account_enabled, set_account_auth, set_account_status, queue_group, queue_groups_file, reset_interrupted_jobs, next_job, enabled_accounts, account_capability, save_capability, account_has_verified_identity, choose_account, mark_running, finish_account, finish_job, add_history, successful_group_before, queue_stats
+vk_network_observer.py SIZE: 3801 FUNCTIONS: 
+vk_notifications.py SIZE: 4405 FUNCTIONS: build_notification, notification_record, _connect_queue, enqueue_notification, pending_notifications, mark_notification_sent
+vk_post_identity.py SIZE: 1323 FUNCTIONS: extract_post_identity, matches_community
+vk_post_reader.py SIZE: 1696 FUNCTIONS: read_post_evidence
+vk_post_response_parser.py SIZE: 1551 FUNCTIONS: parse_wall_post_response
+vk_post_verifier.py SIZE: 2402 FUNCTIONS: normalize_text, text_fingerprint, verify_publication
+vk_production_launcher.py SIZE: 4702 FUNCTIONS: log, read_assignment, db_setting, deny, main
+vk_publication_audit.py SIZE: 1983 FUNCTIONS: audit
+vk_publication_proof.py SIZE: 2076 FUNCTIONS: assess_publication_proof
+vk_publication_registry.py SIZE: 7184 FUNCTIONS: connect, register_attempt, confirm_publication, get_due_deletions, save_post_candidates, save_network_post_candidates
+vk_queue_dispatcher.py SIZE: 15918 FUNCTIONS: log, assert_safety, recent_success, worker_environment, finish_account_safe, run_worker_with_timeout, notify_dispatcher, run_one, wait_delay, assess_dispatcher_candidates, main
+vk_queue_worker_adapter.py SIZE: 8069 FUNCTIONS: env_bool, log, atomic_json, required_env, assert_safety, result_from_record, main
+vk_registry_bridge.py SIZE: 1810 FUNCTIONS: _context, register_before_submit, save_after_submit
+vk_request_matcher.py SIZE: 1490 FUNCTIONS: match_wall_post_request
+vk_server_controller.py SIZE: 10780 FUNCTIONS: now, log, atomic_write_json, read_json, service_is_running, get_main_pid, start_scan, stop_scan, summarize_cloud_state, publish_panel_state, consume_command, assert_safety, main
+vk_telegram_delivery.py SIZE: 6011 FUNCTIONS: load_telegram_settings, send_telegram_message, _delivery_connection, deliver_pending
+vk_worker_final_locked_windows.py SIZE: 26073 FUNCTIONS: log, pause, generate_dates, build_message, normalize_vk_url, load_groups, load_state, save_state, update_group, visible, exact, detect_block, assert_no_block, scan_entries, unique_editor, open_post_editor, fill_and_next, dialog_buttons, final_button_suggest, final_button_create, inspect_submit, remote_submit, do_suggest, do_create, click_membership, read_subscription_state, find_unique_subscribe_button, process_prepare_group, process_group, assert_runtime_safety
+vk_worker_production.py SIZE: 35681 FUNCTIONS: log, pause, generate_dates, load_messages, build_message, normalize_vk_url, load_groups, load_state, save_state, update_group, visible, exact, detect_block, assert_no_block, scan_entries, unique_editor, open_post_editor, fill_and_next, dialog_buttons, ensure_author_signature, final_button_suggest, final_button_create, inspect_submit, collect_post_candidates, compare_post_candidates, remote_submit, do_suggest, do_create, click_membership, read_subscription_state
+vk_worker_server_locked.py SIZE: 26599 FUNCTIONS: log, pause, generate_dates, build_message, normalize_vk_url, load_groups, load_state, save_state, update_group, visible, exact, detect_block, assert_no_block, scan_entries, unique_editor, open_post_editor, fill_and_next, dialog_buttons, final_button_suggest, final_button_create, inspect_submit, remote_submit, do_suggest, do_create, click_membership, read_subscription_state, find_unique_subscribe_button, process_prepare_group, process_group, assert_runtime_safety
+
+=== DATABASE SCHEMAS ===
+DATABASE: vk_multi_account.sqlite3
+ TABLE: account_group_state
+ ROW_COUNT: 0
+ COLUMNS: account_id, group_url, capability, subscription, last_status, last_error, updated_at
+ TABLE: account_verified_identity
+ ROW_COUNT: 3
+ COLUMNS: account_id, vk_user_id, verified_at
+ TABLE: accounts
+ ROW_COUNT: 3
+ COLUMNS: id, code, name, profile_dir, enabled, auth_status, status, last_error, created_at, updated_at, last_started_at, last_finished_at, vk_user_id
+ TABLE: post_history
+ ROW_COUNT: 0
+ COLUMNS: id, queue_id, account_id, group_url, flow, message_text, status, created_at
+ TABLE: queue
+ ROW_COUNT: 100
+ COLUMNS: id, group_url, account_id, requested_flow, selected_flow, status, priority, attempts, message_text, result, error, created_at, not_before, started_at, finished_at
+ TABLE: settings
+ ROW_COUNT: 9
+ COLUMNS: key, value
+ TABLE: sqlite_sequence
+ ROW_COUNT: 2
+ COLUMNS: name, seq
+DATABASE: publications.sqlite3
+ TABLE: network_post_candidates
+ ROW_COUNT: 0
+ COLUMNS: id, queue_id, account_id, vk_post_id, source, verified, discovered_at
+ TABLE: post_candidates
+ ROW_COUNT: 0
+ COLUMNS: id, queue_id, vk_post_id, post_url, verified, discovered_at
+ TABLE: publications
+ ROW_COUNT: 1
+ COLUMNS: id, queue_id, account_id, group_url, flow, vk_post_id, post_url, state, published_at, delete_after, deleted_at, created_at, updated_at
+ TABLE: sqlite_sequence
+ ROW_COUNT: 1
+ COLUMNS: name, seq
+DATABASE: moderation_notifications.sqlite3
+ TABLE: notifications
+ ROW_COUNT: 2
+ COLUMNS: event_key, recipient, status, created_at, delivered_at
+
+=== SYSTEMD VK SERVICES ===
+SERVICE: vkbot-auth-gateway.service STATE: loaded active running
+SERVICE: vkbot-auth-tunnel.service STATE: loaded active running
+SERVICE: vkbot-deletion-review.service STATE: loaded inactive dead
+SERVICE: vkbot-notifications.service STATE: loaded inactive dead
+SERVICE: vkbot-server-controller.service STATE: loaded active running
+SERVICE: vkbot-telegram-wg.service STATE: loaded active exited
+SERVICE: vkbot-telegram.service STATE: loaded active running
+
+=== SAFETY ===
+PRODUCTION_STOP: PRESERVED
+VK_REQUESTS: NONE
+PUBLICATIONS: NONE
+DELETIONS: NONE
+SECRETS_AND_PROFILE_CONTENT: NOT_COLLECTED

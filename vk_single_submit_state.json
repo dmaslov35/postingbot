@@ -1,0 +1,23 @@
+{
+  "groups": {
+    "https://vk.ru/club240781173": {
+      "flow": "SUGGEST",
+      "message": "Водитель, еду 17, 18, 19 октября по направлению\n\nМаршрут следования: Минусинск -> Абакан -> Черногорск -> Красноярск и обратно.\n\nВремя отправления:\nМинусинск: 7:30\nАбакан: 8:00\nЧерногорск: 8:30\n\nОбратно из Красноярска:\nТРЦ Планета: 14:30\nАэропорт: 15:00\n\nЕсть место для посылок.\nОпыт вождения большой, авто комфортное.\n\nТелефон: +79235866030",
+      "status": "PROBABLE",
+      "updated_at": "2026-10-17T08:35:20",
+      "reason": "FINAL_DIALOG_DISAPPEARED",
+      "post_candidates": [],
+      "network_post_candidates": [],
+      "network_publication_verified": false
+    }
+  },
+  "runs": [
+    {
+      "mode": "TEST",
+      "finished_at": "2026-10-17T08:35:20",
+      "posts": 1,
+      "subscriptions": 0,
+      "join_requests": 0
+    }
+  ]
+}

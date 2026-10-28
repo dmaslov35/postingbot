@@ -1,0 +1,42 @@
+nohup: ignoring input
+WebSocket server settings:
+  - Listen on 127.0.0.1:6080
+  - Web server. Web root: /usr/share/novnc
+  - No SSL/TLS support (no cert file)
+  - proxying from 127.0.0.1:6080 to 127.0.0.1:5901
+127.0.0.1 - - [07/Oct/2026 08:18:34] 127.0.0.1: Plain non-SSL (ws://) WebSocket connection
+127.0.0.1 - - [07/Oct/2026 08:18:34] 127.0.0.1: Path: '/websockify'
+127.0.0.1 - - [07/Oct/2026 08:18:34] connecting to: 127.0.0.1:5901
+127.0.0.1 - - [11/Oct/2026 15:01:57] code 404, message File not found
+127.0.0.1 - - [11/Oct/2026 15:02:00] 127.0.0.1: Plain non-SSL (ws://) WebSocket connection
+127.0.0.1 - - [11/Oct/2026 15:02:00] 127.0.0.1: Path: '/websockify'
+127.0.0.1 - - [11/Oct/2026 15:02:00] connecting to: 127.0.0.1:5901
+127.0.0.1 - - [11/Oct/2026 15:03:35] code 404, message File not found
+127.0.0.1 - - [11/Oct/2026 15:03:36] 127.0.0.1: Plain non-SSL (ws://) WebSocket connection
+127.0.0.1 - - [11/Oct/2026 15:03:36] 127.0.0.1: Path: '/websockify'
+127.0.0.1 - - [11/Oct/2026 15:03:36] connecting to: 127.0.0.1:5901
+127.0.0.1 - - [11/Oct/2026 15:05:36] code 404, message File not found
+127.0.0.1 - - [11/Oct/2026 15:05:36] code 404, message File not found
+127.0.0.1 - - [11/Oct/2026 15:05:54] code 404, message File not found
+127.0.0.1 - - [11/Oct/2026 15:06:41] code 404, message File not found
+127.0.0.1 - - [11/Oct/2026 15:06:48] code 404, message File not found
+127.0.0.1 - - [11/Oct/2026 15:06:51] 127.0.0.1: Plain non-SSL (ws://) WebSocket connection
+127.0.0.1 - - [11/Oct/2026 15:06:51] 127.0.0.1: Path: '/websockify'
+127.0.0.1 - - [11/Oct/2026 15:06:51] connecting to: 127.0.0.1:5901
+127.0.0.1 - - [14/Oct/2026 08:39:58] code 400, message Missing Sec-WebSocket-Version header
+127.0.0.1 - - [14/Oct/2026 08:39:58] code 400, message Missing Sec-WebSocket-Version header
+127.0.0.1 - - [14/Oct/2026 08:41:49] 127.0.0.1: Plain non-SSL (ws://) WebSocket connection
+127.0.0.1 - - [14/Oct/2026 08:41:49] 127.0.0.1: Path: '/websockify'
+127.0.0.1 - - [14/Oct/2026 08:41:49] connecting to: 127.0.0.1:5901
+127.0.0.1 - - [14/Oct/2026 08:41:49] 127.0.0.1: Plain non-SSL (ws://) WebSocket connection
+127.0.0.1 - - [14/Oct/2026 08:41:49] connecting to: 127.0.0.1:5901
+127.0.0.1 - - [17/Oct/2026 08:14:29] code 404, message File not found
+127.0.0.1 - - [17/Oct/2026 08:14:32] 127.0.0.1: Plain non-SSL (ws://) WebSocket connection
+127.0.0.1 - - [17/Oct/2026 08:14:32] 127.0.0.1: Path: '/websockify'
+127.0.0.1 - - [17/Oct/2026 08:14:32] connecting to: 127.0.0.1:5901
+127.0.0.1 - - [28/Oct/2026 09:18:36] code 404, message File not found
+127.0.0.1 - - [28/Oct/2026 09:18:37] code 404, message File not found
+127.0.0.1 - - [28/Oct/2026 09:19:11] code 404, message File not found
+127.0.0.1 - - [28/Oct/2026 09:19:13] 127.0.0.1: Plain non-SSL (ws://) WebSocket connection
+127.0.0.1 - - [28/Oct/2026 09:19:13] 127.0.0.1: Path: '/websockify'
+127.0.0.1 - - [28/Oct/2026 09:19:13] connecting to: 127.0.0.1:5901

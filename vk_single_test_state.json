@@ -1,0 +1,55 @@
+{
+  "groups": {
+    "https://vk.ru/club240781173": {
+      "flow": "SUGGEST",
+      "message": "Еду 17, 18, 19 октября!\n\nЕду по маршруту: Минусинск, Абакан, Черногорск, Красноярск и обратно.\n\nВремя отправления:\nМинусинск: 7:30\nАбакан: 8:00\nЧерногорск: 8:30\n\nОбратно из Красноярска:\nТРЦ Планета: 14:30\nАэропорт: 15:00\n\nПосылки беру.\nЗа рулем опытный водитель, машина комфортная.\n\nТелефон: +79235866030",
+      "status": "TEST_READY_NOT_SUBMITTED",
+      "updated_at": "2026-10-17T10:28:20",
+      "error": "RuntimeError('AUTHOR_SIGNATURE_SWITCH_NOT_UNIQUE')"
+    }
+  },
+  "runs": [
+    {
+      "mode": "TEST",
+      "finished_at": "2026-10-16T07:49:01",
+      "posts": 0,
+      "subscriptions": 0,
+      "join_requests": 0
+    },
+    {
+      "mode": "TEST",
+      "finished_at": "2026-10-16T07:51:15",
+      "posts": 0,
+      "subscriptions": 0,
+      "join_requests": 0
+    },
+    {
+      "mode": "TEST",
+      "finished_at": "2026-10-17T08:28:07",
+      "posts": 0,
+      "subscriptions": 0,
+      "join_requests": 0
+    },
+    {
+      "mode": "TEST",
+      "finished_at": "2026-10-17T10:09:10",
+      "posts": 0,
+      "subscriptions": 0,
+      "join_requests": 0
+    },
+    {
+      "mode": "TEST",
+      "finished_at": "2026-10-17T10:19:47",
+      "posts": 0,
+      "subscriptions": 0,
+      "join_requests": 0
+    },
+    {
+      "mode": "TEST",
+      "finished_at": "2026-10-17T10:28:20",
+      "posts": 0,
+      "subscriptions": 0,
+      "join_requests": 0
+    }
+  ]
+}

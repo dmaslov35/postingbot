@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Безопасный монитор публикаций VK. Пока только чтение."""
+
+from pathlib import Path
+import sqlite3
+
+BASE = Path("/opt/vkbot")
+STOP = BASE / "runtime/production.stop"
+DB = BASE / "runtime/publications.sqlite3"
+
+TRACKED_STATES = (
+    "SUBMITTED",
+    "PENDING_MODERATION",
+    "REVIEW_REQUIRED",
+)
+
+
+def inspect_registry():
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REQUIRED")
+
+    if not DB.is_file():
+        raise RuntimeError("PUBLICATION_DATABASE_MISSING")
+
+    con = sqlite3.connect(DB.as_uri() + "?mode=ro", uri=True)
+    con.row_factory = sqlite3.Row
+
+    try:
+        rows = con.execute("""
+            SELECT
+                id,
+                queue_id,
+                account_id,
+                flow,
+                state,
+                vk_post_id,
+                post_url,
+                delete_after
+            FROM publications
+            WHERE state IN (?, ?, ?)
+            ORDER BY id
+        """, TRACKED_STATES).fetchall()
+
+        result = []
+
+        for row in rows:
+            item = dict(row)
+
+            if item["queue_id"] is None:
+                tracking_status = "HISTORICAL_REVIEW"
+            elif item["state"] == "PENDING_MODERATION":
+                tracking_status = "AWAITING_MODERATION"
+            elif item["state"] == "SUBMITTED":
+                tracking_status = "SUBMISSION_REVIEW"
+            else:
+                tracking_status = "MANUAL_REVIEW_REQUIRED"
+
+            item["tracking_status"] = tracking_status
+
+            item["authorship_verified"] = False
+            item["deletion_allowed"] = False
+
+            result.append(item)
+
+        return result
+
+    finally:
+        con.close()
+
+
+def main():
+    records = inspect_registry()
+
+    print("=== VK MODERATION MONITOR ===")
+    print("MODE: READ_ONLY")
+    print("TRACKED_RECORDS:", len(records))
+
+    for item in records:
+        print(
+            "RECORD:",
+            item["id"],
+            "FLOW:", item["flow"],
+            "STATE:", item["state"],
+            "TRACKING:", item["tracking_status"],
+        )
+
+        assert item["deletion_allowed"] is False
+        assert item["authorship_verified"] is False
+
+    assert STOP.is_file()
+
+    print("PASS: MONITOR_READ_ONLY")
+    print("PASS: PRODUCTION_STOP_PRESERVED")
+    print("NO VK REQUESTS")
+    print("NO DATABASE CHANGES")
+    print("NO PUBLICATIONS OR DELETIONS")
+
+
+
+def evaluate_candidate(
+    post_url,
+    expected_owner_id,
+    expected_text,
+    actual_text,
+):
+    """Сравнивает кандидата без подтверждения авторства."""
+    from vk_moderation_matcher import match_moderated_post
+
+    result = match_moderated_post(
+        post_url=post_url,
+        expected_owner_id=expected_owner_id,
+        expected_text=expected_text,
+        actual_text=actual_text,
+    )
+
+    assert result["authorship_verified"] is False
+    assert result["deletion_allowed"] is False
+
+    return result
+
+if __name__ == "__main__":
+    main()
+
+
+def find_publication_on_wall(vk_client, owner_id, expected_text):
+    """Ищет кандидата на стене без подтверждения авторства."""
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REQUIRED")
+
+    from vk_moderation_lookup import find_moderated_post
+
+    result = find_moderated_post(
+        vk=vk_client,
+        owner_id=owner_id,
+        expected_text=expected_text,
+    )
+
+    if not STOP.is_file():
+        raise RuntimeError("PRODUCTION_STOP_REMOVED")
+
+    assert result["authorship_verified"] is False
+    assert result["deletion_allowed"] is False
+
+    return result

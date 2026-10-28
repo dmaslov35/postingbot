@@ -1,0 +1,430 @@
+import vk_publication_registry as registry
+from pathlib import Path
+from datetime import datetime, timedelta
+import json
+import os
+import random
+import subprocess
+import sys
+import time
+import vk_multi_account as multi
+BASE = Path('/opt/vkbot')
+PYTHON = BASE / 'venv' / 'bin' / 'python'
+ADAPTER = BASE / 'vk_queue_worker_adapter.py'
+RUNTIME = BASE / 'runtime'
+STOP_FILE = RUNTIME / 'production.stop'
+LOG_FILE = BASE / 'vk_queue_dispatcher.log'
+PRODUCTION_MASTER_UNLOCKED = True
+REAL_VK_ACTIONS_ENABLED = True
+MAX_PARALLEL = 1
+SUCCESS_STATUSES = {'CONFIRMED', 'PENDING_MODERATION', 'PROBABLE', 'REMOTE_ATTEMPTED', 'UNCERTAIN'}
+SKIP_STATUSES = {'NO_SUPPORTED_ACTION', 'FLOW_NOT_AVAILABLE', 'SUBSCRIBE_REQUIRED', 'JOIN_REQUEST_REQUIRED', 'CREATE_READY_NOT_SUBMITTED'}
+
+def log(message):
+    line = f'[{datetime.now():%Y-%m-%d %H:%M:%S}] {message}'
+    print(line, flush=True)
+    with LOG_FILE.open('a', encoding='utf-8') as f:
+        f.write(line + '\n')
+
+def assert_safety():
+    if not PRODUCTION_MASTER_UNLOCKED:
+        raise RuntimeError('DISPATCHER_MASTER_LOCKED')
+    if not REAL_VK_ACTIONS_ENABLED:
+        raise RuntimeError('DISPATCHER_REAL_ACTIONS_DISABLED')
+    if MAX_PARALLEL != 1:
+        raise RuntimeError('PARALLEL_POSTING_FORBIDDEN')
+    multi.assert_global_safety()
+
+def recent_success(group_url):
+    """
+    Return history only when publication/remote-attempt
+    happened inside configured cooldown window.
+
+    This fixes the old behaviour where one historical success
+    could block a group forever.
+    """
+    cooldown_hours = int(multi.get_setting('group_cooldown_hours', '72'))
+    con = multi.connect()
+    row = con.execute("\n        SELECT *\n        FROM post_history\n        WHERE group_url=?\n          AND status IN (\n              'CONFIRMED',\n              'PENDING_MODERATION',\n              'PROBABLE',\n              'REMOTE_ATTEMPTED',\n              'UNCERTAIN'\n          )\n        ORDER BY id DESC\n        LIMIT 1\n        ", (group_url,)).fetchone()
+    con.close()
+    if row is None:
+        return None
+    try:
+        created = datetime.fromisoformat(row['created_at'])
+    except Exception:
+        return row
+    if datetime.now() - created < timedelta(hours=cooldown_hours):
+        return row
+    return None
+
+def worker_environment(account, job):
+    env = os.environ.copy()
+    env['VKBOT_MULTI_ACCOUNT'] = '1'
+    env['VKBOT_ACCOUNT_ID'] = str(account['id'])
+    env['VKBOT_ACCOUNT_CODE'] = account['code']
+    env['VKBOT_PROFILE'] = account['profile_dir']
+    env['VKBOT_SINGLE_GROUP'] = job['group_url']
+    env['VKBOT_QUEUE_ID'] = str(job['id'])
+    env['VKBOT_REQUESTED_FLOW'] = job['requested_flow']
+    return env
+
+def finish_account_safe(account_id):
+    try:
+        multi.finish_account(account_id)
+    except Exception as exc:
+        log(f'finish_account error: {exc}')
+
+def run_worker_with_timeout(command, cwd, env, timeout, text=True):
+    """
+    Запускает worker в отдельной группе процессов.
+    При таймауте завершает всю группу, включая дочерние процессы.
+    """
+    import signal
+    import time
+    process = subprocess.Popen(command, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=text, start_new_session=True)
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        time.sleep(2)
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        try:
+            process.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+        raise subprocess.TimeoutExpired(command, timeout)
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
+def notify_dispatcher(event, queue_id, account, group_url, reason=""):
+    """Безопасно добавляет событие в очередь Telegram."""
+    try:
+        from vk_notifications import enqueue_notification
+
+        account_code = str(account.get("code", "неизвестен"))[:80]
+        group = str(group_url)[:300]
+        reason = str(reason)[:200]
+
+        details = (
+            f"Задание: #{queue_id}\n"
+            f"VK-аккаунт: {account_code}\n"
+            f"Сообщество: {group}"
+        )
+
+        if reason:
+            details += f"\nПричина: {reason}"
+
+        enqueue_notification(event, details)
+
+    except Exception as exc:
+        log(
+            f"NOTIFICATION_QUEUE_ERROR queue={queue_id} "
+            f"error={type(exc).__name__}"
+        )
+
+
+def run_one(account, job):
+    assert_safety()
+    queue_id = job['id']
+    result_file = RUNTIME / f'queue_{queue_id}.json'
+    try:
+        result_file.unlink()
+    except FileNotFoundError:
+        pass
+    multi.mark_running(queue_id, account['id'])
+    log(f'START queue={queue_id} account=#{account['id']}:{account['code']} group={job['group_url']}')
+    env = worker_environment(account, job)
+    try:
+        result = run_worker_with_timeout([str(PYTHON), str(ADAPTER)], cwd=str(BASE), env=env, text=True, timeout=15 * 60)
+    except subprocess.TimeoutExpired:
+        multi.finish_job(queue_id, 'REVIEW_REQUIRED', error='WORKER_TIMEOUT_CHECK_REQUIRED')
+        notify_dispatcher(
+            'PUBLICATION_REVIEW', queue_id, account,
+            job['group_url'], 'Превышено время ожидания VK'
+        )
+        finish_account_safe(account['id'])
+        log(f'FAILED queue={queue_id}: timeout')
+        return
+    stdout = result.stdout or ''
+    stderr = result.stderr or ''
+    combined = stdout + '\n' + stderr
+    if 'VK_CHALLENGE' in combined or 'VK_VERIFICATION' in combined:
+        multi.set_account_auth(account['id'], 'AUTH_REQUIRED', 'VK verification required')
+        multi.set_account_status(account['id'], 'AUTH_REQUIRED', 'VK verification required')
+        multi.finish_job(queue_id, 'REVIEW_REQUIRED', error='VK_CHALLENGE_PUBLICATION_CHECK_REQUIRED')
+        notify_dispatcher(
+            'VK_AUTH_REQUIRED', queue_id, account,
+            job['group_url'], 'VK требует подтверждения входа'
+        )
+        log(f'AUTH REQUIRED account={account['code']}')
+        return
+    if result.returncode != 0:
+        error = combined[-4000:]
+        if result_file.exists():
+            try:
+                data = json.loads(result_file.read_text(encoding='utf-8'))
+                error = data.get('error') or error
+            except Exception:
+                pass
+        multi.finish_job(queue_id, 'REVIEW_REQUIRED', error='WORKER_ERROR_PUBLICATION_CHECK_REQUIRED: ' + str(error)[:2000])
+        notify_dispatcher(
+            'PUBLICATION_FAILED', queue_id, account,
+            job['group_url'], 'Обработчик завершился с ошибкой'
+        )
+        finish_account_safe(account['id'])
+        log(f'FAILED queue={queue_id} exit={result.returncode}')
+        return
+    if not result_file.exists():
+        multi.finish_job(queue_id, 'REVIEW_REQUIRED', error='WORKER_RESULT_FILE_MISSING_PUBLICATION_CHECK_REQUIRED')
+        notify_dispatcher(
+            'PUBLICATION_FAILED', queue_id, account,
+            job['group_url'], 'Не найден результат обработчика'
+        )
+        finish_account_safe(account['id'])
+        log(f'FAILED queue={queue_id}: result file missing')
+        return
+    try:
+        data = json.loads(result_file.read_text(encoding='utf-8'))
+    except Exception as exc:
+        multi.finish_job(queue_id, 'REVIEW_REQUIRED', error=f'BAD_RESULT_JSON_PUBLICATION_CHECK_REQUIRED:{type(exc).__name__}')
+        notify_dispatcher(
+            'PUBLICATION_FAILED', queue_id, account,
+            job['group_url'], 'Повреждён файл результата'
+        )
+        finish_account_safe(account['id'])
+        return
+    status = data.get('status', 'FAILED')
+    flow = data.get('flow')
+    message = data.get('message')
+    capability = data.get('capability')
+    subscription = data.get('subscription')
+    multi.save_capability(account['id'], job['group_url'], capability, subscription, status, data.get('error'))
+    if status in SUCCESS_STATUSES:
+        multi.add_history(queue_id, account['id'], job['group_url'], flow or 'UNKNOWN', message, status)
+
+        # UI-подтверждение не является доказательством
+        # появления записи на стене сообщества.
+        if flow in ('CREATE', 'SUGGEST'):
+            registry_state = (
+                'PENDING_MODERATION'
+                if flow == 'SUGGEST' and status == 'PENDING_MODERATION'
+                else 'REVIEW_REQUIRED'
+            )
+            try:
+                registry.register_attempt(
+                    queue_id=queue_id,
+                    account_id=account['id'],
+                    group_url=job['group_url'],
+                    flow=flow,
+                    state=registry_state
+                )
+                proof_result = assess_dispatcher_candidates(
+                    queue_id=queue_id,
+                    account_id=account['id'],
+                    group_url=job['group_url'],
+                    message=message,
+                    candidates=data.get('post_candidates', [])
+                )
+                log(
+                    f"PUBLICATION_PROOF queue={queue_id} "
+                    f"checked={proof_result['checked']} "
+                    f"verified={proof_result['verified']} "
+                    f"reason={proof_result['reason']}"
+                )
+                registry.save_post_candidates(
+                    queue_id=queue_id,
+                    candidates=data.get('post_candidates', [])
+                )
+
+                # Сетевые post_id — только неподтверждённые кандидаты.
+                network_ids = data.get('network_post_candidates', [])
+                if not isinstance(network_ids, list):
+                    network_ids = []
+
+                saved_network = registry.save_network_post_candidates(
+                    queue_id=queue_id,
+                    account_id=account['id'],
+                    candidates=network_ids
+                )
+                log(
+                    f"NETWORK_POST_CANDIDATES queue={queue_id} "
+                    f"saved={saved_network} verified=False"
+                )
+            except Exception as exc:
+                log(
+                    f'REGISTRY_ERROR queue={queue_id} '
+                    f'error={type(exc).__name__}'
+                )
+
+        multi.finish_job(
+            queue_id,
+            'REVIEW_REQUIRED',
+            result=status,
+            error='PUBLICATION_NOT_VERIFIED_ON_WALL',
+            selected_flow=flow,
+            message_text=message
+        )
+    elif status in SKIP_STATUSES:
+        multi.finish_job(queue_id, 'SKIPPED', result=status, selected_flow=flow, message_text=message)
+    else:
+        multi.finish_job(queue_id, 'FAILED', result=status, error=data.get('error'), selected_flow=flow, message_text=message)
+    if status in SUCCESS_STATUSES:
+        notify_dispatcher(
+            'PUBLICATION_REVIEW', queue_id, account,
+            job['group_url'],
+            'Попытка отправки завершена. Проверьте объявление в VK.'
+        )
+    elif status not in SKIP_STATUSES:
+        notify_dispatcher(
+            'PUBLICATION_FAILED', queue_id, account,
+            job['group_url'], 'Обработчик сообщил об ошибке'
+        )
+
+    finish_account_safe(account['id'])
+    try:
+        result_file.unlink()
+    except Exception:
+        pass
+    log(f'FINISH queue={queue_id} account={account['code']} status={status} flow={flow}')
+
+def wait_delay():
+    minimum = int(multi.get_setting('min_delay_sec', '900'))
+    maximum = int(multi.get_setting('max_delay_sec', '2100'))
+    minimum = max(0, minimum)
+    maximum = max(minimum, maximum)
+    delay = random.randint(minimum, maximum)
+    log(f'NEXT JOB DELAY {delay} sec')
+    for _ in range(delay):
+        if STOP_FILE.exists():
+            return False
+        time.sleep(1)
+    return True
+
+
+def assess_dispatcher_candidates(
+    queue_id, account_id, group_url, message, candidates
+):
+    """Оценивает кандидатов без подтверждения авторства."""
+    from vk_publication_proof import assess_publication_proof
+    from vk_post_identity import extract_post_identity
+    import re
+
+    group_match = re.search(
+        r"(?:club|public)(\d+)",
+        str(group_url)
+    )
+
+    if not group_match:
+        return {
+            "checked": 0,
+            "verified": 0,
+            "reason": "GROUP_OWNER_UNKNOWN",
+        }
+
+    owner_id = -int(group_match.group(1))
+    checked = 0
+
+    for candidate in (candidates or [])[:100]:
+        if not isinstance(candidate, dict):
+            continue
+
+        result = assess_publication_proof(
+            queue_id=queue_id,
+            account_id=account_id,
+            group_owner_id=owner_id,
+            expected_text=message,
+            candidate_url=candidate.get("post_url"),
+        )
+
+        checked += 1
+
+        if result.get("verified"):
+            raise RuntimeError(
+                "Unexpected automatic publication verification"
+            )
+
+    return {
+        "checked": checked,
+        "verified": 0,
+        "reason": "TRUSTED_ORIGIN_NOT_AVAILABLE",
+    }
+
+
+
+def main():
+    if STOP_FILE.exists():
+        log('PRODUCTION BLOCKED: production.stop exists')
+        return
+    multi.init_db()
+    multi.reset_interrupted_jobs()
+    RUNTIME.mkdir(parents=True, exist_ok=True)
+    assert_safety()
+    log('QUEUE DISPATCHER START parallel=1')
+    while True:
+        if STOP_FILE.exists():
+            log('STOP FILE DETECTED')
+            break
+        job = multi.next_job()
+        if not job:
+            log('QUEUE EMPTY')
+            break
+        old = recent_success(job['group_url'])
+        if old:
+            multi.finish_job(job['id'], 'SKIPPED', result='GROUP_COOLDOWN_ACTIVE')
+            log(f'SKIP cooldown {job['group_url']}')
+            continue
+        with registry.connect() as publication_db:
+            unresolved = publication_db.execute(
+                '''
+                SELECT id, state
+                FROM publications
+                WHERE group_url=?
+                  AND state IN (
+                      'SUBMITTED',
+                      'PENDING_MODERATION',
+                      'REVIEW_REQUIRED',
+                      'PUBLISHED',
+                      'DELETE_DUE',
+                      'DELETE_FAILED'
+                  )
+                LIMIT 1
+                ''',
+                (job['group_url'],)
+            ).fetchone()
+        if unresolved:
+            multi.finish_job(
+                job['id'],
+                'REVIEW_REQUIRED',
+                error='EXISTING_PUBLICATION_CHECK_REQUIRED'
+            )
+            log(
+                f"BLOCK_DUPLICATE queue={job['id']} "
+                f"publication={unresolved['id']} "
+                f"state={unresolved['state']}"
+            )
+            continue
+        account = multi.choose_account(job)
+        if not account:
+            log('NO AVAILABLE AUTHORIZED ACCOUNT')
+            break
+        run_one(account, job)
+        if STOP_FILE.exists():
+            break
+        next_waiting = multi.next_job()
+        if next_waiting:
+            if not wait_delay():
+                break
+    log('QUEUE DISPATCHER FINISHED')
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as exc:
+        log(f'FATAL {type(exc).__name__}: {exc}')
+        sys.exit(20)

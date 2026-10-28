@@ -1,0 +1,18 @@
+[2026-10-07 08:25:10] ========================================================================
+[2026-10-07 08:25:10] VK WORKER UNIFIED START MODE=PRODUCTION
+[2026-10-07 08:25:10] GROUPS=1
+[2026-10-07 08:25:10] FLAGS production=True test_submit=False subscribe=False
+[2026-10-07 08:25:13] GROUP 1/1
+[2026-10-07 08:25:13] ========================================================================
+[2026-10-07 08:25:13] OPEN https://vk.ru/club240781173
+[2026-10-07 08:25:36] FINAL URL https://vk.ru/club240781173
+[2026-10-07 08:25:36] TITLE Тест
+[2026-10-07 08:25:45] EDITOR TEXT VERIFIED
+[2026-10-07 08:25:48] NEXT CLICKED
+[2026-10-07 08:25:48] SUGGEST FINAL BUTTON UNIQUE
+[2026-10-07 08:25:48] STATE https://vk.ru/club240781173 -> INTENT
+[2026-10-07 08:25:48] STATE https://vk.ru/club240781173 -> REMOTE_ATTEMPTED
+[2026-10-07 08:25:48] SUGGEST: REMOTE SUBMIT ONE ATTEMPT
+[2026-10-07 08:25:51] STATE https://vk.ru/club240781173 -> PROBABLE
+[2026-10-07 08:25:51] SUGGEST: RESULT PROBABLE (FINAL_DIALOG_DISAPPEARED)
+[2026-10-07 08:25:51] STOP after remote post attempt

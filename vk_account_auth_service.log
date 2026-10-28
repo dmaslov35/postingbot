@@ -1,0 +1,62 @@
+2026-10-02 14:32:01 START account_id=2
+2026-10-02 14:32:09 AUTH: ACCOUNT: Второй аккаунт
+2026-10-02 14:32:09 AUTH: PROFILE: /opt/vkbot/accounts/second/profile
+2026-10-02 14:32:09 AUTH: Opening VK...
+2026-10-02 14:32:09 AUTH: 
+2026-10-02 14:32:09 AUTH: Complete login in VNC.
+2026-10-02 14:32:09 AUTH: When VK feed is visible, return here and press ENTER.
+2026-10-02 14:32:09 AUTH: Traceback (most recent call last):
+2026-10-02 14:32:09 AUTH:   File "/opt/vkbot/vk_account_auth.py", line 198, in <module>
+2026-10-02 14:32:09 AUTH:     main()
+2026-10-02 14:32:09 AUTH:   File "/opt/vkbot/vk_account_auth.py", line 149, in main
+2026-10-02 14:32:09 AUTH:     input()
+2026-10-02 14:32:09 AUTH: EOFError: EOF when reading a line
+2026-10-02 14:32:09 FINISH account_id=2 returncode=1
+2026-10-02 15:20:27 START account_id=2
+2026-10-02 15:35:35 AUTH: ACCOUNT: Второй аккаунт
+2026-10-02 15:35:35 AUTH: PROFILE: /opt/vkbot/accounts/second/profile
+2026-10-02 15:35:35 AUTH: Opening VK...
+2026-10-02 15:35:35 AUTH: 
+2026-10-02 15:35:35 AUTH: Complete login in VNC.
+2026-10-02 15:35:35 AUTH: When VK feed is visible, return here and press ENTER.
+2026-10-02 15:35:35 AUTH: 
+2026-10-02 15:35:35 AUTH: Complete login in VNC.
+2026-10-02 15:35:35 AUTH: Authorization will be detected automatically.
+2026-10-02 15:35:35 AUTH: Waiting for VK authorization...
+2026-10-02 15:35:35 AUTH: AUTHORIZATION TIMEOUT
+2026-10-02 15:35:35 AUTH: Traceback (most recent call last):
+2026-10-02 15:35:35 AUTH:   File "/opt/vkbot/vk_account_auth.py", line 283, in <module>
+2026-10-02 15:35:35 AUTH:     main()
+2026-10-02 15:35:35 AUTH:   File "/opt/vkbot/vk_account_auth.py", line 229, in main
+2026-10-02 15:35:35 AUTH:     browser.close()
+2026-10-02 15:35:35 AUTH:     ^^^^^^^
+2026-10-02 15:35:35 AUTH: NameError: name 'browser' is not defined
+2026-10-02 15:35:35 FINISH account_id=2 returncode=1
+2026-10-07 07:07:03 START account_id=2
+2026-10-07 07:12:51 AUTH: ACCOUNT: Второй аккаунт
+2026-10-07 07:12:51 AUTH: PROFILE: /opt/vkbot/accounts/second/profile
+2026-10-07 07:12:51 AUTH: Opening VK...
+2026-10-07 07:12:51 AUTH: 
+2026-10-07 07:12:51 AUTH: Complete login in VNC.
+2026-10-07 07:12:51 AUTH: When VK feed is visible, return here and press ENTER.
+2026-10-07 07:12:51 AUTH: 
+2026-10-07 07:12:51 AUTH: Complete login in VNC.
+2026-10-07 07:12:51 AUTH: Authorization will be detected automatically.
+2026-10-07 07:12:51 AUTH: Waiting for VK authorization...
+2026-10-07 07:12:51 AUTH: VK AUTHORIZATION DETECTED
+2026-10-07 07:12:51 AUTH: AUTHORIZED
+2026-10-07 07:12:51 FINISH account_id=2 returncode=0
+2026-10-07 07:38:01 START account_id=2
+2026-10-07 07:38:32 AUTH: ACCOUNT: Второй аккаунт
+2026-10-07 07:38:32 AUTH: PROFILE: /opt/vkbot/accounts/second/profile
+2026-10-07 07:38:32 AUTH: Opening VK...
+2026-10-07 07:38:32 AUTH: 
+2026-10-07 07:38:32 AUTH: Complete login in VNC.
+2026-10-07 07:38:32 AUTH: When VK feed is visible, return here and press ENTER.
+2026-10-07 07:38:32 AUTH: 
+2026-10-07 07:38:32 AUTH: Complete login in VNC.
+2026-10-07 07:38:32 AUTH: Authorization will be detected automatically.
+2026-10-07 07:38:32 AUTH: Waiting for VK authorization...
+2026-10-07 07:38:32 AUTH: VK AUTHORIZATION DETECTED
+2026-10-07 07:38:32 AUTH: AUTHORIZED
+2026-10-07 07:38:32 FINISH account_id=2 returncode=0
